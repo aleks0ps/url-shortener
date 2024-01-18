@@ -5,8 +5,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/aleks0ps/url-service/cmd/shortener/config"
-	"github.com/aleks0ps/url-service/internal/app/handler"
+	"github.com/aleks0ps/url-shortener/cmd/shortener/config"
+	"github.com/aleks0ps/url-shortener/internal/app/handler"
 )
 
 func Run() {

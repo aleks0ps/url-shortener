@@ -1,4 +1,4 @@
-module github.com/aleks0ps/url-service
+module github.com/aleks0ps/url-shortener
 
 go 1.21.5
 

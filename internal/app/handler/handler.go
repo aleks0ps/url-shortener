@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aleks0ps/url-service/internal/app/storage"
+	"github.com/aleks0ps/url-shortener/internal/app/storage"
 )
 
 type ContentType int

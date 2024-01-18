@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 
-	"github.com/aleks0ps/url-service/internal/app/storage"
+	"github.com/aleks0ps/url-shortener/internal/app/storage"
 
 	"github.com/stretchr/testify/assert"
 )

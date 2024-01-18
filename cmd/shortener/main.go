@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/aleks0ps/url-service/internal/app"
+	"github.com/aleks0ps/url-shortener/internal/app"
 )
 
 func main() {
