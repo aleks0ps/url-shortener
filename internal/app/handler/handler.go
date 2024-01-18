@@ -61,10 +61,7 @@ func GenerateShortKey() string {
 }
 
 func emptyURL(url string) bool {
-	if len(strings.TrimSpace(url)) == 0 {
-		return true
-	}
-	return false
+	return len(strings.TrimSpace(url)) == 0
 }
 
 func SetBaseURL(url string) {

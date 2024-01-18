@@ -21,7 +21,7 @@ SERVER_PORT := 8080
 export SERVER_PORT
 
 .PHONY: test
-test:
+test: build
 	@mkdir -vp test
 	@if ! test -f test/shortenertest; then \
 	  wget -P test/ https://github.com/Yandex-Practicum/go-autotests/releases/download/v0.10.3/shortenertest; \
