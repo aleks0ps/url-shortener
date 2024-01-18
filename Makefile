@@ -1,7 +1,7 @@
 BUILD := build
 CMD := ./cmd
 APP := shortener
-MODULE := github.com/aleks0ps/url-service
+MODULE := github.com/aleks0ps/url-shortener
 
 .PHONY: all
 all: build
