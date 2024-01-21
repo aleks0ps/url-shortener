@@ -14,6 +14,13 @@ import (
 
 type ContentType int
 
+// Service runtime context
+type Runtime struct {
+	BaseURL       string
+	ListenAddress string
+	URLs          *storage.URLStorage
+}
+
 const (
 	Unsupported ContentType = iota
 	PlainText
@@ -36,9 +43,6 @@ var supportedTypes = []ContentTypes{
 	},
 }
 
-// set this from config
-var baseURL string
-
 func checkContentType(name string) ContentType {
 	for _, t := range supportedTypes {
 		if name == t.name {
@@ -48,7 +52,7 @@ func checkContentType(name string) ContentType {
 	return Unsupported
 }
 
-func GenerateShortKey() string {
+func generateShortKey() string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	const keyLength = 6
 
@@ -60,73 +64,49 @@ func GenerateShortKey() string {
 	return string(shortKey)
 }
 
-func emptyURL(url string) bool {
-	return len(strings.TrimSpace(url)) == 0
-}
-
-func SetBaseURL(url string) {
-	baseURL = url
-}
-
 // Send response to POST requests
-func ShortenURL(w http.ResponseWriter, r *http.Request) {
-	if emptyURL(baseURL) {
-		panic("baseURL is no set")
-	}
-	if r.Method == http.MethodPost {
-		contentType := r.Header.Get("Content-Type")
-		if checkContentType(contentType) == URLEncoded {
-			r.ParseForm()
-			origURL := strings.Join(r.PostForm["url"], "")
-			// XXX
-			if len(origURL) == 0 {
-				w.WriteHeader(http.StatusBadRequest)
-			}
-			shortKey := GenerateShortKey()
-			storage.StoreURL(shortKey, string(origURL))
-			shortenedURL := fmt.Sprintf("%s/%s", baseURL, shortKey)
-			// Return url
-			w.Header().Set("Content-Type", "text/plain")
-			w.Header().Set("Content-Length", strconv.Itoa(len(shortenedURL)))
-			// 201
-			w.WriteHeader(http.StatusCreated)
-			//
-			fmt.Fprint(w, shortenedURL)
-		} else {
-			origURL, err := io.ReadAll(r.Body)
-			if err != nil {
-				panic(err)
-			}
-			shortKey := GenerateShortKey()
-			storage.StoreURL(shortKey, string(origURL))
-			shortenedURL := fmt.Sprintf("%s/%s", baseURL, shortKey)
-			// Return url
-			w.Header().Set("Content-Type", "text/plain")
-			w.Header().Set("Content-Length", strconv.Itoa(len(shortenedURL)))
-			// 201
-			w.WriteHeader(http.StatusCreated)
-			//
-			fmt.Fprint(w, shortenedURL)
+func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
+	contentType := r.Header.Get("Content-Type")
+	if checkContentType(contentType) == URLEncoded {
+		r.ParseForm()
+		origURL := strings.Join(r.PostForm["url"], "")
+		// XXX
+		if len(origURL) == 0 {
+			w.WriteHeader(http.StatusBadRequest)
 		}
+		shortKey := generateShortKey()
+		rt.URLs.StoreURL(shortKey, string(origURL))
+		shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, shortKey)
+		// Return url
+		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Content-Length", strconv.Itoa(len(shortenedURL)))
+		// 201
+		w.WriteHeader(http.StatusCreated)
+		//
+		fmt.Fprint(w, shortenedURL)
+	} else {
+		origURL, err := io.ReadAll(r.Body)
+		if err != nil {
+			panic(err)
+		}
+		shortKey := generateShortKey()
+		rt.URLs.StoreURL(shortKey, string(origURL))
+		shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, shortKey)
+		// Return url
+		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Content-Length", strconv.Itoa(len(shortenedURL)))
+		// 201
+		w.WriteHeader(http.StatusCreated)
+		//
+		fmt.Fprint(w, shortenedURL)
 	}
 }
 
-func GetOrigURL(w http.ResponseWriter, r *http.Request) {
-	if emptyURL(baseURL) {
-		panic("baseURL is no set")
-	}
-	if r.Method == http.MethodGet {
-		// ignore
-		if r.URL.RequestURI() == "/favicon.ico" {
-		} else {
-			shortKey := r.URL.RequestURI()[1:]
-			origURL, ok := storage.GetOrigURL(shortKey)
-			if ok {
-				http.Redirect(w, r, origURL, http.StatusTemporaryRedirect)
-			} else {
-				w.WriteHeader(http.StatusBadRequest)
-			}
-		}
+func (rt *Runtime) GetOrigURL(w http.ResponseWriter, r *http.Request) {
+	shortKey := r.URL.RequestURI()[1:]
+	origURL, ok := rt.URLs.GetURL(shortKey)
+	if ok {
+		http.Redirect(w, r, origURL, http.StatusTemporaryRedirect)
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
 	}

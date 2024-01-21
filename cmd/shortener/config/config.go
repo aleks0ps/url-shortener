@@ -17,16 +17,16 @@ type Config struct {
 	BaseURL    string `env:"BASE_URL"`
 }
 
-var Options Config = Config{
-	ListenAddr: defaultAddress,
-	BaseURL:    defaultBaseURL,
-}
-
-func ParseOptions() {
-	if err := env.Parse(&Options); err != nil {
+func ParseOptions() *Config {
+	opts := Config{
+		ListenAddr: defaultAddress,
+		BaseURL:    defaultBaseURL,
+	}
+	if err := env.Parse(&opts); err != nil {
 		fmt.Println("failed:", err)
 	}
-	flag.StringVar(&Options.ListenAddr, "a", Options.ListenAddr, "Listen address:port")
-	flag.StringVar(&Options.BaseURL, "b", Options.BaseURL, "Base URL for shortened url")
+	flag.StringVar(&opts.ListenAddr, "a", opts.ListenAddr, "Listen address:port")
+	flag.StringVar(&opts.BaseURL, "b", opts.BaseURL, "Base URL for shortened url")
 	flag.Parse()
+	return &opts
 }

@@ -14,7 +14,6 @@ import (
 
 func TestShortenURL(t *testing.T) {
 	contentType := "text/plain"
-	baseURL := "http://localhost:8080"
 	testCases := []struct {
 		method       string
 		body         string
@@ -24,8 +23,12 @@ func TestShortenURL(t *testing.T) {
 		{method: http.MethodPost, body: "https://ya.ru", expectedCode: http.StatusCreated, expectedBody: ""},
 		{method: http.MethodPost, body: "", expectedCode: http.StatusCreated, expectedBody: ""},
 	}
-	SetBaseURL(baseURL)
-	handler := http.HandlerFunc(ShortenURL)
+	rt := Runtime{
+		BaseURL:       "http://localhost:8080",
+		ListenAddress: "",
+		URLs:          storage.NewURLStorage(),
+	}
+	handler := http.HandlerFunc(rt.ShortenURL)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -45,7 +48,6 @@ func TestShortenURL(t *testing.T) {
 
 func TestGetOrigURL(t *testing.T) {
 	contentType := "text/plain"
-	baseURL := "http://localhost:8080"
 	urls := []struct {
 		key     string
 		origURL string
@@ -53,12 +55,15 @@ func TestGetOrigURL(t *testing.T) {
 		{key: "qsBVYP", origURL: "https://ya.ru"},
 		{key: "35D0WW", origURL: "https://google.com"},
 	}
-	SetBaseURL(baseURL)
-	for _, url := range urls {
-		storage.StoreURL(url.key, url.origURL)
+	rt := Runtime{
+		BaseURL:       "http://localhost:8080",
+		ListenAddress: "",
+		URLs:          storage.NewURLStorage(),
 	}
-
-	handler := http.HandlerFunc(GetOrigURL)
+	for _, url := range urls {
+		rt.URLs.StoreURL(url.key, url.origURL)
+	}
+	handler := http.HandlerFunc(rt.GetOrigURL)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
