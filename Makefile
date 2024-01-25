@@ -32,7 +32,15 @@ test: build
 	@cd test && ./shortenertest -test.v -test.run=^TestIteration3$$ -source-path=../
 	@cd test && ./shortenertest -test.v -test.run=^TestIteration1$$ -binary-path=../build/shortener/shortener -server-port=$$SERVER_PORT
 
-	
+YA := https://ya.ru
+GOOGLE := https://www.google.com
+SVC := http://localhost:8080
+ 
+curl:
+	curl -X POST -d "url=$(YA)" $(SVC)
+	curl -X POST -d "url=$(GOOGLE)" $(SVC)
+	@echo
+
 .PHONY: clean
 clean:
 	rm -rvf $(BUILD)
