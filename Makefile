@@ -27,10 +27,15 @@ test: build
 	  wget -P test/ https://github.com/Yandex-Practicum/go-autotests/releases/download/v0.10.3/shortenertest; \
 	  chmod +x test/shortenertest; \
 	fi
+	if ! test -f test/shortenertestbeta; then \
+	  wget -P test/ https://github.com/Yandex-Practicum/go-autotests/releases/download/v0.10.3/shortenertestbeta; \
+	  chmod +x test/shortenertestbeta; \
+	fi
 	@cd test && ./shortenertest -test.v -test.run=^TestIteration1$$ -binary-path=../build/shortener/shortener
 	@cd test && ./shortenertest -test.v -test.run=^TestIteration2$$ -source-path=../
 	@cd test && ./shortenertest -test.v -test.run=^TestIteration3$$ -source-path=../
 	@cd test && ./shortenertest -test.v -test.run=^TestIteration1$$ -binary-path=../build/shortener/shortener -server-port=$$SERVER_PORT
+	@cd test && ./shortenertestbeta -test.v -test.run=^TestIteration6$$ -source-path=../ -binary-path=../build/shortener/shortener
 
 YA := https://ya.ru
 GOOGLE := https://www.google.com
