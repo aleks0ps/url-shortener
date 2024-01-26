@@ -24,10 +24,10 @@ func Run() {
 		panic(err)
 	}
 	defer logger.Sync()
-	sugar := *logger.Sugar()
+	sugar := logger.Sugar()
 	r := chi.NewRouter()
 	r.Use(mw.DisableDefaultLogger())
-	r.Use(mw.Logger(&sugar))
+	r.Use(mw.Logger(sugar))
 	r.Get("/{id}", rt.GetOrigURL)
 	r.Post("/", rt.ShortenURL)
 	http.ListenAndServe(rt.ListenAddress, r)
