@@ -29,6 +29,7 @@ func Run() {
 	r.Use(mw.DisableDefaultLogger())
 	r.Use(mw.Logger(sugar))
 	r.Get("/{id}", rt.GetOrigURL)
+	r.Post("/api/shorten", rt.ShortenURLJSON)
 	r.Post("/", rt.ShortenURL)
 	http.ListenAndServe(rt.ListenAddress, r)
 }

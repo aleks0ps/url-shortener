@@ -43,7 +43,10 @@ SVC := http://localhost:8080
  
 curl:
 	curl -X POST -d "url=$(YA)" $(SVC)
-	curl -X POST -d "url=$(GOOGLE)" $(SVC)
+	@echo
+	curl -X POST -d "url=$(GOOGLE)" $(SVC);
+	@echo
+	curl -X POST -H "Content-Type: application/json" -d '{"url":"$(YA)"}' $(SVC)/api/shorten 
 	@echo
 
 .PHONY: clean
