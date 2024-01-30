@@ -14,6 +14,7 @@ import (
 
 func TestShortenURL(t *testing.T) {
 	contentType := "text/plain"
+	storagePath := "/tmp/short-url-db.json"
 	testCases := []struct {
 		method       string
 		body         string
@@ -26,7 +27,7 @@ func TestShortenURL(t *testing.T) {
 	rt := Runtime{
 		BaseURL:       "http://localhost:8080",
 		ListenAddress: "",
-		URLs:          storage.NewURLStorage(),
+		URLs:          storage.NewURLStorage(storagePath),
 	}
 	handler := http.HandlerFunc(rt.ShortenURL)
 	srv := httptest.NewServer(handler)
@@ -48,6 +49,7 @@ func TestShortenURL(t *testing.T) {
 
 func TestGetOrigURL(t *testing.T) {
 	contentType := "text/plain"
+	storagePath := "/tmp/short-url-db.json"
 	urls := []struct {
 		key     string
 		origURL string
@@ -58,7 +60,7 @@ func TestGetOrigURL(t *testing.T) {
 	rt := Runtime{
 		BaseURL:       "http://localhost:8080",
 		ListenAddress: "",
-		URLs:          storage.NewURLStorage(),
+		URLs:          storage.NewURLStorage(storagePath),
 	}
 	for _, url := range urls {
 		rt.URLs.StoreURL(url.key, url.origURL)
