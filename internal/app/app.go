@@ -28,6 +28,7 @@ func Run() {
 	r := chi.NewRouter()
 	r.Use(mw.DisableDefaultLogger())
 	r.Use(mw.Logger(sugar))
+	r.Use(mw.Gziper())
 	r.Get("/{id}", rt.GetOrigURL)
 	r.Post("/api/shorten", rt.ShortenURLJSON)
 	r.Post("/", rt.ShortenURL)

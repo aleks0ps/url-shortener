@@ -48,6 +48,10 @@ curl:
 	@echo
 	curl -X POST -H "Content-Type: application/json" -d '{"url":"$(YA)"}' $(SVC)/api/shorten 
 	@echo
+gzip:
+	@echo '{"url":"$(YA)"}' | gzip | curl -v -i --data-binary @- -H "Content-Type: application/json" -H "Content-Encoding: gzip" $(SVC)/api/shorten
+	@echo
+
 
 .PHONY: clean
 clean:

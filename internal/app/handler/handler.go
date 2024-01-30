@@ -28,11 +28,15 @@ const (
 	PlainText
 	URLEncoded
 	JSON
+	JS
+	CSS
+	HTML
+	XML
 )
 
 type ContentTypes struct {
-	name string
-	code ContentType
+	Name string
+	Code ContentType
 }
 
 type RequestJSON struct {
@@ -43,34 +47,50 @@ type ResponseJSON struct {
 	Result string `json:"result"`
 }
 
-var supportedTypes = []ContentTypes{
+var SupportedTypes = []ContentTypes{
 	{
-		name: "text/plain",
-		code: PlainText,
+		Name: "text/plain",
+		Code: PlainText,
 	},
 	{
-		name: "application/x-www-form-urlencoded",
-		code: URLEncoded,
+		Name: "application/x-www-form-urlencoded",
+		Code: URLEncoded,
 	},
 	{
-		name: "application/json",
-		code: JSON,
+		Name: "application/json",
+		Code: JSON,
+	},
+	{
+		Name: "application/javascript",
+		Code: JS,
+	},
+	{
+		Name: "text/css",
+		Code: CSS,
+	},
+	{
+		Name: "text/html",
+		Code: HTML,
+	},
+	{
+		Name: "text/xml",
+		Code: XML,
 	},
 }
 
-func getContentTypeCode(name string) ContentType {
-	for _, t := range supportedTypes {
-		if name == t.name {
-			return t.code
+func GetContentTypeCode(name string) ContentType {
+	for _, t := range SupportedTypes {
+		if name == t.Name {
+			return t.Code
 		}
 	}
 	return Unsupported
 }
 
-func getContentTypeName(code ContentType) string {
-	for _, t := range supportedTypes {
-		if code == t.code {
-			return t.name
+func GetContentTypeName(code ContentType) string {
+	for _, t := range SupportedTypes {
+		if code == t.Code {
+			return t.Name
 		}
 	}
 	return "unsupported"
@@ -90,7 +110,7 @@ func generateShortKey() string {
 
 func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
-	if getContentTypeCode(contentType) == JSON {
+	if GetContentTypeCode(contentType) == JSON {
 		var reqJSON RequestJSON
 		var resJSON ResponseJSON
 		var buf bytes.Buffer
@@ -116,7 +136,7 @@ func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", getContentTypeName(JSON))
+		w.Header().Set("Content-Type", GetContentTypeName(JSON))
 		w.Header().Set("Content-Length", strconv.Itoa(len(res)))
 		// 201
 		w.WriteHeader(http.StatusCreated)
@@ -129,7 +149,7 @@ func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 // Send response to POST requests
 func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
-	if getContentTypeCode(contentType) == URLEncoded {
+	if GetContentTypeCode(contentType) == URLEncoded {
 		r.ParseForm()
 		origURL := strings.Join(r.PostForm["url"], "")
 		// XXX
@@ -140,7 +160,7 @@ func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		rt.URLs.StoreURL(shortKey, string(origURL))
 		shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, shortKey)
 		// Return url
-		w.Header().Set("Content-Type", getContentTypeName(PlainText))
+		w.Header().Set("Content-Type", GetContentTypeName(PlainText))
 		w.Header().Set("Content-Length", strconv.Itoa(len(shortenedURL)))
 		// 201
 		w.WriteHeader(http.StatusCreated)
@@ -155,7 +175,7 @@ func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		rt.URLs.StoreURL(shortKey, string(origURL))
 		shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, shortKey)
 		// Return url
-		w.Header().Set("Content-Type", getContentTypeName(PlainText))
+		w.Header().Set("Content-Type", GetContentTypeName(PlainText))
 		w.Header().Set("Content-Length", strconv.Itoa(len(shortenedURL)))
 		// 201
 		w.WriteHeader(http.StatusCreated)
