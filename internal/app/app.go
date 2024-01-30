@@ -17,8 +17,9 @@ func Run() {
 	rt := handler.Runtime{
 		BaseURL:       opts.BaseURL,
 		ListenAddress: opts.ListenAddr,
-		URLs:          storage.NewURLStorage(),
+		URLs:          storage.NewURLStorage(opts.StoragePath),
 	}
+	rt.URLs.LoadFromFile()
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		panic(err)
