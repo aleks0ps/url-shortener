@@ -25,7 +25,7 @@ type URLEvent struct {
 func NewURLStorage(filename string) *URLStorage {
 	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, err.Error())
+		fmt.Fprint(os.Stderr, err.Error())
 		return nil
 	}
 	URLs := URLStorage{
