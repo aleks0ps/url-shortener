@@ -18,6 +18,7 @@ func Run() {
 		BaseURL:       opts.BaseURL,
 		ListenAddress: opts.ListenAddr,
 		URLs:          storage.NewURLStorage(opts.StoragePath),
+		DbURL:         opts.DatabaseDSN,
 	}
 	rt.URLs.LoadFromFile()
 	logger, err := zap.NewDevelopment()
@@ -30,6 +31,7 @@ func Run() {
 	r.Use(mw.DisableDefaultLogger())
 	r.Use(mw.Logger(sugar))
 	r.Use(mw.Gziper())
+	r.Get("/ping", rt.DbIsAlive)
 	r.Get("/{id}", rt.GetOrigURL)
 	r.Post("/api/shorten", rt.ShortenURLJSON)
 	r.Post("/", rt.ShortenURL)

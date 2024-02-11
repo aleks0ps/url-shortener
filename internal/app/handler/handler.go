@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/aleks0ps/url-shortener/internal/app/storage"
+	"github.com/jackc/pgx/v4"
 )
 
 type ContentType int
@@ -21,6 +23,7 @@ type Runtime struct {
 	BaseURL       string
 	ListenAddress string
 	URLs          *storage.URLStorage
+	DbURL         string
 }
 
 const (
@@ -155,6 +158,7 @@ func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		// XXX
 		if len(origURL) == 0 {
 			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 		shortKey := generateShortKey()
 		rt.URLs.StoreURL(shortKey, string(origURL))
@@ -192,4 +196,16 @@ func (rt *Runtime) GetOrigURL(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
 	}
+}
+
+func (rt *Runtime) DbIsAlive(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, rt.DbURL)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	defer conn.Close(ctx)
+	w.WriteHeader(http.StatusOK)
 }
