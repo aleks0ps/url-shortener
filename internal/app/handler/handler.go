@@ -23,7 +23,7 @@ type Runtime struct {
 	BaseURL       string
 	ListenAddress string
 	URLs          *storage.URLStorage
-	DbURL         string
+	DBURL         string
 }
 
 const (
@@ -198,9 +198,9 @@ func (rt *Runtime) GetOrigURL(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (rt *Runtime) DbIsAlive(w http.ResponseWriter, r *http.Request) {
+func (rt *Runtime) DBIsAlive(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, rt.DbURL)
+	conn, err := pgx.Connect(ctx, rt.DBURL)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
