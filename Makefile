@@ -48,7 +48,7 @@ curl:
 gzip:
 	@echo '{"url":"$(YA)"}' | gzip | curl -v -i --data-binary @- -H "Content-Type: application/json" -H "Content-Encoding: gzip" $(SVC)/api/shorten; echo
 
-#export DATABASE_DSN := postgres://url-shortener:url-shortener@localhost:5432/url-shortener
+export DATABASE_DSN := postgres://url-shortener:url-shortener@localhost:5432/url-shortener
 
 up:
 	sudo docker compose up -d

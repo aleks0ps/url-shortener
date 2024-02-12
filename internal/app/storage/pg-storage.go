@@ -13,6 +13,16 @@ type PGURLStorage struct {
 	DB *pgxpool.Pool
 }
 
+func tmpCreateTable(ctx context.Context, db *pgxpool.Pool) {
+	_, err := db.Exec(ctx, `CREATE TABLE IF NOT EXISTS urls (
+			uuid SERIAL PRIMARY KEY,
+			short_url TEXT NOT NULL,
+			original_url TEXT NOT NULL)`)
+	if err != nil {
+		log.Fatalln("Unable to create table in a database:", err)
+	}
+}
+
 func PGNewURLStorage(ctx context.Context, databaseDSN string) *PGURLStorage {
 	if len(databaseDSN) > 0 {
 		poolConfig, err := pgxpool.ParseConfig(databaseDSN)
@@ -25,6 +35,7 @@ func PGNewURLStorage(ctx context.Context, databaseDSN string) *PGURLStorage {
 			log.Fatalln("Unable to create connection pool:", err)
 			return nil
 		}
+		tmpCreateTable(ctx, db)
 		return &PGURLStorage{DB: db}
 	}
 	return &PGURLStorage{DB: nil}
