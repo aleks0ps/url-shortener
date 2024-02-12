@@ -23,21 +23,29 @@ type URLEvent struct {
 }
 
 func NewURLStorage(filename string) *URLStorage {
-	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		fmt.Fprint(os.Stderr, err.Error())
-		return nil
+	if len(filename) > 0 {
+		file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
+			return nil
+		}
+		URLs := URLStorage{
+			db:      make(map[string]string),
+			file:    file,
+			writer:  bufio.NewWriter(file),
+			scanner: bufio.NewScanner(file),
+		}
+		return &URLs
 	}
-	URLs := URLStorage{
-		db:      make(map[string]string),
-		file:    file,
-		writer:  bufio.NewWriter(file),
-		scanner: bufio.NewScanner(file),
-	}
-	return &URLs
+	// just in-memory storage
+	return &URLStorage{db: make(map[string]string), file: nil, writer: nil, scanner: nil}
 }
 
 func (u *URLStorage) LoadFromFile() {
+	// no persistent storage available
+	if u.file == nil || u.writer == nil || u.scanner == nil {
+		return
+	}
 	for {
 		if !u.scanner.Scan() {
 			if u.scanner.Err() == nil {
@@ -60,24 +68,28 @@ func (u *URLStorage) LoadFromFile() {
 }
 
 func (u *URLStorage) StoreURL(key string, origURL string) {
-	u.db[key] = origURL
-	event := URLEvent{ID: uint(len(u.db)), Key: key, URL: origURL}
-	data, err := json.Marshal(&event)
-	if err != nil {
-		fmt.Fprint(os.Stderr, err.Error())
-		return
-	}
-	if _, err := u.writer.Write(data); err != nil {
-		fmt.Fprint(os.Stderr, err.Error())
-		return
-	}
-	if err := u.writer.WriteByte('\n'); err != nil {
-		fmt.Fprint(os.Stderr, err.Error())
-		return
-	}
-	if err := u.writer.Flush(); err != nil {
-		fmt.Fprint(os.Stderr, err.Error())
-		return
+	// no persistent storage available
+	if u.file == nil || u.writer == nil || u.scanner == nil {
+		u.db[key] = origURL
+	} else {
+		event := URLEvent{ID: uint(len(u.db)), Key: key, URL: origURL}
+		data, err := json.Marshal(&event)
+		if err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
+			return
+		}
+		if _, err := u.writer.Write(data); err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
+			return
+		}
+		if err := u.writer.WriteByte('\n'); err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
+			return
+		}
+		if err := u.writer.Flush(); err != nil {
+			fmt.Fprint(os.Stderr, err.Error())
+			return
+		}
 	}
 }
 

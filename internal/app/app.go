@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -13,12 +14,15 @@ import (
 )
 
 func Run() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	opts := config.ParseOptions()
 	rt := handler.Runtime{
 		BaseURL:       opts.BaseURL,
 		ListenAddress: opts.ListenAddr,
-		URLs:          storage.NewURLStorage(opts.StoragePath),
 		DBURL:         opts.DatabaseDSN,
+		URLs:          storage.NewURLStorage(opts.StoragePath),
+		URLsDB:        storage.PGNewURLStorage(ctx, opts.DatabaseDSN),
 	}
 	rt.URLs.LoadFromFile()
 	logger, err := zap.NewDevelopment()

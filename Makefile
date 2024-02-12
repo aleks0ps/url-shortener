@@ -42,16 +42,21 @@ GOOGLE := https://www.google.com
 SVC := http://localhost:8080
  
 curl:
-	curl -X POST -d "url=$(YA)" $(SVC)
-	@echo
-	curl -X POST -d "url=$(GOOGLE)" $(SVC);
-	@echo
-	curl -X POST -H "Content-Type: application/json" -d '{"url":"$(YA)"}' $(SVC)/api/shorten 
-	@echo
+	@curl -X POST -d "url=$(YA)" $(SVC); echo
+	@curl -X POST -d "url=$(GOOGLE)" $(SVC); echo
+	@curl -X POST -H "Content-Type: application/json" -d '{"url":"$(YA)"}' $(SVC)/api/shorten; echo
 gzip:
-	@echo '{"url":"$(YA)"}' | gzip | curl -v -i --data-binary @- -H "Content-Type: application/json" -H "Content-Encoding: gzip" $(SVC)/api/shorten
-	@echo
+	@echo '{"url":"$(YA)"}' | gzip | curl -v -i --data-binary @- -H "Content-Type: application/json" -H "Content-Encoding: gzip" $(SVC)/api/shorten; echo
 
+export DATABASE_DSN := postgres://url-shortener:url-shortener@localhost:5432/url-shortener
+
+up:
+	sudo docker compose up -d
+	while ! pg_isready -q -h localhost; do true; done
+	psql "$(DATABASE_DSN)" -f db/urls_table.sql
+
+down:
+	sudo docker compose down
 
 .PHONY: clean
 clean:

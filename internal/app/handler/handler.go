@@ -2,7 +2,6 @@ package handler
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,8 +21,9 @@ type ContentType int
 type Runtime struct {
 	BaseURL       string
 	ListenAddress string
-	URLs          *storage.URLStorage
 	DBURL         string
+	URLs          *storage.URLStorage
+	URLsDB        *storage.PGURLStorage
 }
 
 const (
@@ -131,7 +131,11 @@ func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		shortKey := generateShortKey()
-		rt.URLs.StoreURL(shortKey, reqJSON.URL)
+		if rt.URLsDB.IsReady() {
+			rt.URLsDB.StoreURL(r.Context(), shortKey, reqJSON.URL)
+		} else {
+			rt.URLs.StoreURL(shortKey, reqJSON.URL)
+		}
 		shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, shortKey)
 		resJSON.Result = shortenedURL
 		res, err := json.Marshal(resJSON)
@@ -155,13 +159,16 @@ func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	if GetContentTypeCode(contentType) == URLEncoded {
 		r.ParseForm()
 		origURL := strings.Join(r.PostForm["url"], "")
-		// XXX
 		if len(origURL) == 0 {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		shortKey := generateShortKey()
-		rt.URLs.StoreURL(shortKey, string(origURL))
+		if rt.URLsDB.IsReady() {
+			rt.URLsDB.StoreURL(r.Context(), shortKey, string(origURL))
+		} else {
+			rt.URLs.StoreURL(shortKey, string(origURL))
+		}
 		shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, shortKey)
 		// Return url
 		w.Header().Set("Content-Type", GetContentTypeName(PlainText))
@@ -176,7 +183,11 @@ func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 		shortKey := generateShortKey()
-		rt.URLs.StoreURL(shortKey, string(origURL))
+		if rt.URLsDB.IsReady() {
+			rt.URLsDB.StoreURL(r.Context(), shortKey, string(origURL))
+		} else {
+			rt.URLs.StoreURL(shortKey, string(origURL))
+		}
 		shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, shortKey)
 		// Return url
 		w.Header().Set("Content-Type", GetContentTypeName(PlainText))
@@ -189,8 +200,14 @@ func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rt *Runtime) GetOrigURL(w http.ResponseWriter, r *http.Request) {
+	var origURL string
+	var ok bool
 	shortKey := r.URL.RequestURI()[1:]
-	origURL, ok := rt.URLs.GetURL(shortKey)
+	if rt.URLsDB.IsReady() {
+		origURL, ok = rt.URLsDB.GetURL(r.Context(), shortKey)
+	} else {
+		origURL, ok = rt.URLs.GetURL(shortKey)
+	}
 	if ok {
 		http.Redirect(w, r, origURL, http.StatusTemporaryRedirect)
 	} else {
@@ -199,13 +216,12 @@ func (rt *Runtime) GetOrigURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rt *Runtime) DBIsAlive(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, rt.DBURL)
+	conn, err := pgx.Connect(r.Context(), rt.DBURL)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
-	defer conn.Close(ctx)
+	defer conn.Close(r.Context())
 	w.WriteHeader(http.StatusOK)
 }

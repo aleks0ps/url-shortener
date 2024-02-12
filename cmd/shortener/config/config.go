@@ -11,7 +11,7 @@ const (
 	defaultAddress     = "localhost:8080"
 	defaultBaseURL     = "http://localhost:8080"
 	defaultStoragePath = "/tmp/short-url-db.json"
-	defaultDatabaseDSN = "postgres://postgres:postgres@localhost:5432/postgres"
+	defaultDatabaseDSN = "postgres://url-shortener:url-shortener@localhost:5432/url-shortener"
 )
 
 type Config struct {
@@ -25,8 +25,8 @@ func ParseOptions() *Config {
 	opts := Config{
 		ListenAddr:  defaultAddress,
 		BaseURL:     defaultBaseURL,
-		StoragePath: defaultStoragePath,
-		DatabaseDSN: defaultDatabaseDSN,
+		StoragePath: "",
+		DatabaseDSN: "",
 	}
 	if err := env.Parse(&opts); err != nil {
 		fmt.Println("failed:", err)

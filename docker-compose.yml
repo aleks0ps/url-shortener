@@ -4,8 +4,8 @@ services:
     image: postgres:15.5-bookworm
     restart: always
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=postgres
+      - POSTGRES_USER=url-shortener
+      - POSTGRES_PASSWORD=url-shortener
+      - POSTGRES_DB=url-shortener
     ports:
       - 5432:5432
