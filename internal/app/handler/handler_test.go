@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,8 +14,11 @@ import (
 )
 
 func TestShortenURL(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
 	contentType := "text/plain"
 	storagePath := "/tmp/short-url-db.json"
+	databaseDSN := ""
 	testCases := []struct {
 		method       string
 		body         string
@@ -27,7 +31,9 @@ func TestShortenURL(t *testing.T) {
 	rt := Runtime{
 		BaseURL:       "http://localhost:8080",
 		ListenAddress: "",
+		DBURL:         databaseDSN,
 		URLs:          storage.NewURLStorage(storagePath),
+		URLsDB:        storage.PGNewURLStorage(ctx, databaseDSN),
 	}
 	handler := http.HandlerFunc(rt.ShortenURL)
 	srv := httptest.NewServer(handler)
@@ -48,8 +54,11 @@ func TestShortenURL(t *testing.T) {
 }
 
 func TestGetOrigURL(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
 	contentType := "text/plain"
 	storagePath := "/tmp/short-url-db.json"
+	databaseDSN := ""
 	urls := []struct {
 		key     string
 		origURL string
@@ -60,10 +69,18 @@ func TestGetOrigURL(t *testing.T) {
 	rt := Runtime{
 		BaseURL:       "http://localhost:8080",
 		ListenAddress: "",
+		DBURL:         databaseDSN,
 		URLs:          storage.NewURLStorage(storagePath),
+		URLsDB:        storage.PGNewURLStorage(ctx, databaseDSN),
 	}
-	for _, url := range urls {
-		rt.URLs.StoreURL(url.key, url.origURL)
+	if rt.URLsDB.IsReady() {
+		for _, url := range urls {
+			rt.URLsDB.StoreURL(ctx, url.key, url.origURL)
+		}
+	} else {
+		for _, url := range urls {
+			rt.URLs.StoreURL(url.key, url.origURL)
+		}
 	}
 	handler := http.HandlerFunc(rt.GetOrigURL)
 	srv := httptest.NewServer(handler)

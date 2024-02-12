@@ -72,6 +72,7 @@ func (u *URLStorage) StoreURL(key string, origURL string) {
 	if u.file == nil || u.writer == nil || u.scanner == nil {
 		u.db[key] = origURL
 	} else {
+		u.db[key] = origURL
 		event := URLEvent{ID: uint(len(u.db)), Key: key, URL: origURL}
 		data, err := json.Marshal(&event)
 		if err != nil {
