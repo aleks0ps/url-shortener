@@ -13,11 +13,11 @@ type PGURLStorage struct {
 	DB *pgxpool.Pool
 }
 
-func PGNewURLStorage(ctx context.Context, database_dsn string) *PGURLStorage {
-	if len(database_dsn) > 0 {
-		poolConfig, err := pgxpool.ParseConfig(database_dsn)
+func PGNewURLStorage(ctx context.Context, databaseDSN string) *PGURLStorage {
+	if len(databaseDSN) > 0 {
+		poolConfig, err := pgxpool.ParseConfig(databaseDSN)
 		if err != nil {
-			log.Fatalln("Unable to parse `database_dns`:", err)
+			log.Fatalln("Unable to parse `databaseDSN`:", err)
 			return nil
 		}
 		db, err := pgxpool.NewWithConfig(ctx, poolConfig)
