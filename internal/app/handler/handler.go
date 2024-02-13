@@ -137,7 +137,7 @@ func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if len(reqJSONBatch) == 0 {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		for _, req := range reqJSONBatch {
