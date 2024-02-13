@@ -2,11 +2,13 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 
 	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -61,13 +63,16 @@ func (p *PGURLStorage) StoreURL(ctx context.Context, key string, origURL string)
 	}
 	if _, err := p.DB.Exec(ctx, `insert into urls(short_url, original_url) values ($1,$2)`, key, origURL); err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
-		if pgerrcode.IsIntegrityConstraintViolation(err.Error()) {
-			err := p.DB.QueryRow(ctx, "select short_url from urls where original_url=$1", origURL).Scan(&uniqKey)
-			if err != nil {
-				fmt.Fprint(os.Stderr, err.Error())
-				return "", false
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
+				err := p.DB.QueryRow(ctx, "select short_url from urls where original_url=$1", origURL).Scan(&uniqKey)
+				if err != nil {
+					fmt.Fprint(os.Stderr, err.Error())
+					return "", false
+				}
+				return uniqKey, true
 			}
-			return uniqKey, true
 		}
 	}
 	return "", false

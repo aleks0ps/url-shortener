@@ -39,6 +39,7 @@ test: build
 	@cd test && ./shortenertest -test.v -test.run=^TestIteration1$$ -binary-path=../build/shortener/shortener -server-port=$$SERVER_PORT
 	@cd test && ./shortenertestbeta -test.v -test.run=^TestIteration6$$ -source-path=../ -binary-path=../build/shortener/shortener
 	@cd test && ./shortenertestbeta -test.v -test.run=^TestIteration11$$ -binary-path=../build/shortener/shortener -database-dsn='$(DATABASE_DSN)'
+	@cd test && ./shortenertestbeta -test.v -test.run=^TestIteration13$$ -binary-path=../build/shortener/shortener -database-dsn='$(DATABASE_DSN)'
 
 YA := https://ya.ru
 GOOGLE := https://www.google.com
