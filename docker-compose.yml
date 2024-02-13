@@ -1,0 +1,11 @@
+version: "3.9"
+services:
+  pg:
+    image: postgres:15.5-bookworm
+    restart: always
+    environment:
+      - POSTGRES_USER=url-shortener
+      - POSTGRES_PASSWORD=url-shortener
+      - POSTGRES_DB=url-shortener
+    ports:
+      - 5432:5432
