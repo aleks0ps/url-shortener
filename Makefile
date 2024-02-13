@@ -20,6 +20,8 @@ build: go.mod
 SERVER_PORT := 8080
 export SERVER_PORT
 
+export DATABASE_DSN := postgres://url-shortener:url-shortener@localhost:5432/url-shortener?sslmode=disable
+
 .PHONY: test
 test: build
 	@mkdir -vp test
@@ -36,6 +38,7 @@ test: build
 	@cd test && ./shortenertest -test.v -test.run=^TestIteration3$$ -source-path=../
 	@cd test && ./shortenertest -test.v -test.run=^TestIteration1$$ -binary-path=../build/shortener/shortener -server-port=$$SERVER_PORT
 	@cd test && ./shortenertestbeta -test.v -test.run=^TestIteration6$$ -source-path=../ -binary-path=../build/shortener/shortener
+	@cd test && ./shortenertestbeta -test.v -test.run=^TestIteration11$$ -binary-path=../build/shortener/shortener -database-dsn='$(DATABASE_DSN)'
 
 YA := https://ya.ru
 GOOGLE := https://www.google.com
@@ -53,9 +56,9 @@ batch:
 	@echo '[{"correlation_id":"1","original_url":"$(YA)"},{"correlation_id":"2","original_url":"$(GOOGLE)"}]' | \
 		curl -X POST -v -i --data-binary @- -H "Content-Type: application/json" $(SVC)/api/shorten/batch; echo
 
-
-
-export DATABASE_DSN := postgres://url-shortener:url-shortener@localhost:5432/url-shortener
+conflict:
+	@curl -X POST -H "Content-Type: application/json" -d '{"url":"$(YA)"}' $(SVC)/api/shorten; echo
+	@curl -X POST -H "Content-Type: application/json" -d '{"url":"$(YA)"}' $(SVC)/api/shorten; echo
 
 up:
 	sudo docker compose up -d

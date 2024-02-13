@@ -27,7 +27,7 @@ func tmpCreateTable(ctx context.Context, db *pgxpool.Pool) {
 func tmpCreateIndex(ctx context.Context, db *pgxpool.Pool) {
 	_, err := db.Exec(ctx, `CREATE UNIQUE INDEX uniq_urls ON urls (original_url) NULLS NOT DISTINCT`)
 	if err != nil {
-		log.Fatalln("Unable to create index for original_url in urls table: ", err)
+		log.Println("Unable to create index for original_url in urls table: ", err)
 	}
 }
 
