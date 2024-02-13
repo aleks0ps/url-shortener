@@ -48,6 +48,13 @@ curl:
 gzip:
 	@echo '{"url":"$(YA)"}' | gzip | curl -v -i --data-binary @- -H "Content-Type: application/json" -H "Content-Encoding: gzip" $(SVC)/api/shorten; echo
 
+batch:
+	@echo '[{"correlation_id":"1","original_url":"$(YA)"}]' | curl -X POST -v -i --data-binary @- -H "Content-Type: application/json" $(SVC)/api/shorten/batch; echo
+	@echo '[{"correlation_id":"1","original_url":"$(YA)"},{"correlation_id":"2","original_url":"$(GOOGLE)"}]' | \
+		curl -X POST -v -i --data-binary @- -H "Content-Type: application/json" $(SVC)/api/shorten/batch; echo
+
+
+
 export DATABASE_DSN := postgres://url-shortener:url-shortener@localhost:5432/url-shortener
 
 up:

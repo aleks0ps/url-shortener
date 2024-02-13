@@ -38,6 +38,7 @@ func Run() {
 	r.Get("/ping", rt.DBIsAlive)
 	r.Get("/{id}", rt.GetOrigURL)
 	r.Post("/api/shorten", rt.ShortenURLJSON)
+	r.Post("/api/shorten/batch", rt.ShortenURLJSONBatch)
 	r.Post("/", rt.ShortenURL)
 	http.ListenAndServe(rt.ListenAddress, r)
 }
