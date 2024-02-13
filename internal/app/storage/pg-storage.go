@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -23,6 +24,13 @@ func tmpCreateTable(ctx context.Context, db *pgxpool.Pool) {
 	}
 }
 
+func tmpCreateIndex(ctx context.Context, db *pgxpool.Pool) {
+	_, err := db.Exec(ctx, `CREATE UNIQUE INDEX uniq_urls ON urls (original_url) NULLS NOT DISTINCT`)
+	if err != nil {
+		log.Fatalln("Unable to create index for original_url in urls table: ", err)
+	}
+}
+
 func PGNewURLStorage(ctx context.Context, databaseDSN string) *PGURLStorage {
 	if len(databaseDSN) > 0 {
 		poolConfig, err := pgxpool.ParseConfig(databaseDSN)
@@ -36,6 +44,7 @@ func PGNewURLStorage(ctx context.Context, databaseDSN string) *PGURLStorage {
 			return nil
 		}
 		tmpCreateTable(ctx, db)
+		tmpCreateIndex(ctx, db)
 		return &PGURLStorage{DB: db}
 	}
 	return &PGURLStorage{DB: nil}
@@ -45,15 +54,23 @@ func (p *PGURLStorage) IsReady() bool {
 	return p.DB != nil
 }
 
-func (p *PGURLStorage) StoreURL(ctx context.Context, key string, origURL string) {
+func (p *PGURLStorage) StoreURL(ctx context.Context, key string, origURL string) (uniqKey string, urlExist bool) {
 	if p.DB == nil {
 		fmt.Fprintln(os.Stderr, "error: no connection to database")
-		return
+		return "", false
 	}
 	if _, err := p.DB.Exec(ctx, `insert into urls(short_url, original_url) values ($1,$2)`, key, origURL); err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
-		return
+		if pgerrcode.IsIntegrityConstraintViolation(err.Error()) {
+			err := p.DB.QueryRow(ctx, "select short_url from urls where original_url=$1", origURL).Scan(&uniqKey)
+			if err != nil {
+				fmt.Fprint(os.Stderr, err.Error())
+				return "", false
+			}
+			return uniqKey, true
+		}
 	}
+	return "", false
 }
 
 func (p *PGURLStorage) GetURL(ctx context.Context, key string) (string, bool) {
