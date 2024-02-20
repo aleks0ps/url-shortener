@@ -37,6 +37,7 @@ func NewURLStorage(filename string, s *zap.SugaredLogger) *URLStorage {
 			file:    file,
 			writer:  bufio.NewWriter(file),
 			scanner: bufio.NewScanner(file),
+			logger:  s,
 		}
 		return &URLs
 	}
