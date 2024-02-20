@@ -16,7 +16,7 @@ type PGURLStorage struct {
 	logger *zap.SugaredLogger
 }
 
-func tmpDbInit(ctx context.Context, db *pgxpool.Pool, s *zap.SugaredLogger) {
+func tmpDBInit(ctx context.Context, db *pgxpool.Pool, s *zap.SugaredLogger) {
 	_, err := db.Exec(ctx, `CREATE TABLE IF NOT EXISTS urls (
 			uuid BIGSERIAL PRIMARY KEY,
 			short_url TEXT NOT NULL,
@@ -40,7 +40,7 @@ func PGNewURLStorage(ctx context.Context, databaseDSN string, s *zap.SugaredLogg
 			s.Errorln("Unable to create connection pool:", err)
 			return nil
 		}
-		tmpDbInit(ctx, db, s)
+		tmpDBInit(ctx, db, s)
 		return &PGURLStorage{DB: db, logger: s}
 	}
 	return &PGURLStorage{DB: nil, logger: s}
