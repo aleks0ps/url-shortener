@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"errors"
-	"os"
 
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -50,38 +49,80 @@ func (p *PGURLStorage) IsReady() bool {
 	return p.DB != nil
 }
 
-func (p *PGURLStorage) Store(ctx context.Context, key string, origURL string) (oKey string, dup bool) {
+func (p *PGURLStorage) StoreBatch(ctx context.Context, URLs map[string]*URLRecord) (map[string]*URLRecord, bool, error) {
+	var origURLs map[string]*URLRecord = make(map[string]*URLRecord)
 	if !p.IsReady() {
-		p.logger.Errorln(os.Stderr, "error: no connection to database")
-		return "", false
+		err := errors.New("no connection to database")
+		p.logger.Errorln(err.Error())
+		return origURLs, false, err
+	}
+	tx, err := p.DB.Begin(ctx)
+	if err != nil {
+		p.logger.Errorln(err.Error())
+		return origURLs, false, err
+	}
+	defer tx.Rollback(ctx)
+	for id, URLrec := range URLs {
+		_, err := tx.Exec(ctx, `insert into urls(short_url, original_url) values ($1,$2)`, URLrec.ShortKey, URLrec.OriginalURL)
+		if err != nil {
+			p.logger.Errorln(err.Error())
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) {
+				if pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
+					var origKey string
+					err := p.DB.QueryRow(ctx, "select short_url from urls where original_url=$1", URLrec.OriginalURL).Scan(&origKey)
+					if err != nil {
+						p.logger.Errorln(err.Error())
+						return origURLs, true, err
+					}
+					// save original short key
+					origURLs[id] = &URLRecord{ShortKey: origKey, OriginalURL: URLrec.OriginalURL}
+					return origURLs, true, err
+				}
+			}
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		p.logger.Errorln(err.Error())
+		return origURLs, false, err
+	}
+	return origURLs, false, nil
+}
+
+func (p *PGURLStorage) Store(ctx context.Context, key string, origURL string) (origKey string, exist bool, e error) {
+	if !p.IsReady() {
+		err := errors.New("no connection to database")
+		p.logger.Errorln(err.Error())
+		return "", false, err
 	}
 	if _, err := p.DB.Exec(ctx, `insert into urls(short_url, original_url) values ($1,$2)`, key, origURL); err != nil {
 		p.logger.Errorln(err.Error())
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			if pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
-				err := p.DB.QueryRow(ctx, "select short_url from urls where original_url=$1", origURL).Scan(&oKey)
+				err := p.DB.QueryRow(ctx, "select short_url from urls where original_url=$1", origURL).Scan(&origKey)
 				if err != nil {
 					p.logger.Errorln(err.Error())
-					return "", false
+					return "", false, err
 				}
-				return oKey, true
+				return origKey, true, err
 			}
 		}
 	}
-	return "", false
+	return "", false, nil
 }
 
-func (p *PGURLStorage) Load(ctx context.Context, key string) (string, bool) {
+func (p *PGURLStorage) Load(ctx context.Context, key string) (string, bool, error) {
 	var URL string
 	if !p.IsReady() {
-		p.logger.Errorln("error: no connection to database")
-		return "", false
+		err := errors.New("no connection to database")
+		p.logger.Errorln(err.Error())
+		return "", false, err
 	}
 	err := p.DB.QueryRow(ctx, "select original_url from urls where short_url=$1", key).Scan(&URL)
 	if err != nil {
 		p.logger.Errorln(err.Error())
-		return "", false
+		return "", false, err
 	}
-	return URL, true
+	return URL, true, nil
 }

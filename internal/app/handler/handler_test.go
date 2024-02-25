@@ -100,7 +100,7 @@ func TestGetOrigURL(t *testing.T) {
 		URLs:          storageURLs,
 	}
 	for _, url := range urls {
-		_, _ = rt.URLs.Store(ctx, url.key, url.origURL)
+		_, _, _ = rt.URLs.Store(ctx, url.key, url.origURL)
 	}
 	handler := http.HandlerFunc(rt.GetOrigURL)
 	srv := httptest.NewServer(handler)
