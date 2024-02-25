@@ -150,14 +150,12 @@ func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	var URLs map[string]*storage.URLRecord
-	URLs = make(map[string]*storage.URLRecord)
+	URLs := make(map[string]*storage.URLRecord)
 	for _, req := range reqJSONBatch {
-		var URLrec storage.URLRecord
-		URLrec = storage.URLRecord{ShortKey: generateShortKey(), OriginalURL: req.OriginalURL}
+		URLrec := storage.URLRecord{ShortKey: generateShortKey(), OriginalURL: req.OriginalURL}
 		URLs[req.CorrelationID] = &URLrec
 	}
-	var origURLs map[string]*storage.URLRecord = make(map[string]*storage.URLRecord)
+	origURLs := make(map[string]*storage.URLRecord)
 	origURLs, exist, _ := rt.URLs.StoreBatch(r.Context(), URLs)
 	if exist {
 		for id, URLrec := range origURLs {

@@ -50,7 +50,7 @@ func (p *PGURLStorage) IsReady() bool {
 }
 
 func (p *PGURLStorage) StoreBatch(ctx context.Context, URLs map[string]*URLRecord) (map[string]*URLRecord, bool, error) {
-	var origURLs map[string]*URLRecord = make(map[string]*URLRecord)
+	origURLs := make(map[string]*URLRecord)
 	if !p.IsReady() {
 		err := errors.New("no connection to database")
 		p.logger.Errorln(err.Error())

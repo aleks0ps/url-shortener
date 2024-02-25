@@ -81,7 +81,7 @@ func (u *URLStorage) isDuplicate(ctx context.Context, URL string) (string, bool)
 }
 
 func (u *URLStorage) StoreBatch(ctx context.Context, URLs map[string]*URLRecord) (map[string]*URLRecord, bool, error) {
-	var origURLs map[string]*URLRecord = make(map[string]*URLRecord)
+	origURLs := make(map[string]*URLRecord)
 	for id, URL := range URLs {
 		origKey, exist, err := u.Store(ctx, URL.ShortKey, URL.OriginalURL)
 		if exist {

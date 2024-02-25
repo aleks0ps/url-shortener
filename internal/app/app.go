@@ -39,8 +39,10 @@ func Run() {
 	sugar := logger.Sugar()
 	opts := config.ParseOptions()
 	// init storage
-	storage = newDBStorage(ctx, opts, sugar)
-	if storage == nil {
+	db := newDBStorage(ctx, opts, sugar)
+	if db != nil {
+		storage = db
+	} else {
 		storage = newMemStorage(ctx, opts, sugar)
 	}
 	rt := handler.Runtime{
