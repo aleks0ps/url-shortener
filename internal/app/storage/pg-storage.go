@@ -15,7 +15,7 @@ type PGURLStorage struct {
 	logger *zap.SugaredLogger
 }
 
-func tmpDBInit(ctx context.Context, db *pgxpool.Pool, s *zap.SugaredLogger) {
+func tmpDBInit(ctx context.Context, db *pgxpool.Pool, s *zap.SugaredLogger) error {
 	_, err := db.Exec(ctx, `CREATE TABLE IF NOT EXISTS urls (
 			uuid BIGSERIAL PRIMARY KEY,
 			short_url TEXT NOT NULL,
@@ -24,25 +24,24 @@ func tmpDBInit(ctx context.Context, db *pgxpool.Pool, s *zap.SugaredLogger) {
 			`)
 	if err != nil {
 		s.Infoln("Unable to init db:", err)
-	}
-}
-
-func PGNewURLStorage(ctx context.Context, databaseDSN string, s *zap.SugaredLogger) *PGURLStorage {
-	if len(databaseDSN) > 0 {
-		poolConfig, err := pgxpool.ParseConfig(databaseDSN)
-		if err != nil {
-			s.Errorln("Unable to parse `databaseDSN`:", err)
-			return nil
-		}
-		db, err := pgxpool.NewWithConfig(ctx, poolConfig)
-		if err != nil {
-			s.Errorln("Unable to create connection pool:", err)
-			return nil
-		}
-		tmpDBInit(ctx, db, s)
-		return &PGURLStorage{DB: db, logger: s}
+		return err
 	}
 	return nil
+}
+
+func PGNewURLStorage(ctx context.Context, databaseDSN string, s *zap.SugaredLogger) (*PGURLStorage, error) {
+	poolConfig, err := pgxpool.ParseConfig(databaseDSN)
+	if err != nil {
+		s.Errorln("Unable to parse `databaseDSN`:", err)
+		return nil, err
+	}
+	db, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	if err != nil {
+		s.Errorln("Unable to create connection pool:", err)
+		return nil, err
+	}
+	_ = tmpDBInit(ctx, db, s)
+	return &PGURLStorage{DB: db, logger: s}, nil
 }
 
 func (p *PGURLStorage) StoreBatch(ctx context.Context, URLs map[string]*URLRecord) (map[string]*URLRecord, bool, error) {

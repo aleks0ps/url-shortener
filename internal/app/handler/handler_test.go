@@ -36,12 +36,11 @@ func TestShortenURL(t *testing.T) {
 	defer logger.Sync()
 	sugar := logger.Sugar()
 	var storageURLs Storager
-	db := storage.PGNewURLStorage(ctx, databaseDSN, sugar)
-	mem := storage.NewURLStorage(storagePath, sugar)
-	if db != nil {
+	db, err := storage.PGNewURLStorage(ctx, databaseDSN, sugar)
+	if err != nil {
 		storageURLs = db
 	} else {
-		storageURLs = mem
+		storageURLs = storage.NewURLStorage(storagePath, sugar)
 	}
 	rt := Runtime{
 		BaseURL:       "http://localhost:8080",
@@ -86,12 +85,11 @@ func TestGetOrigURL(t *testing.T) {
 	defer logger.Sync()
 	sugar := logger.Sugar()
 	var storageURLs Storager
-	db := storage.PGNewURLStorage(ctx, databaseDSN, sugar)
-	mem := storage.NewURLStorage(storagePath, sugar)
-	if db != nil {
+	db, err := storage.PGNewURLStorage(ctx, databaseDSN, sugar)
+	if err != nil {
 		storageURLs = db
 	} else {
-		storageURLs = mem
+		storageURLs = storage.NewURLStorage(storagePath, sugar)
 	}
 	rt := Runtime{
 		BaseURL:       "http://localhost:8080",

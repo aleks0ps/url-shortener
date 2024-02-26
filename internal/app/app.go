@@ -14,7 +14,12 @@ import (
 )
 
 func newDBStorage(ctx context.Context, opts *config.Config, logger *zap.SugaredLogger) *storage.PGURLStorage {
-	return storage.PGNewURLStorage(ctx, opts.DatabaseDSN, logger)
+	db, err := storage.PGNewURLStorage(ctx, opts.DatabaseDSN, logger)
+	if err != nil {
+		logger.Infoln(err)
+		return nil
+	}
+	return db
 }
 
 func newMemStorage(ctx context.Context, opts *config.Config, logger *zap.SugaredLogger) *storage.URLStorage {
