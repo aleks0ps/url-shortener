@@ -23,7 +23,7 @@ func tmpDBInit(ctx context.Context, db *pgxpool.Pool, s *zap.SugaredLogger) erro
 			CREATE UNIQUE INDEX uniq_urls ON urls (original_url) NULLS NOT DISTINCT
 			`)
 	if err != nil {
-		s.Infoln("Unable to init db:", err)
+		s.Errorln("Unable to init db:", err)
 		return err
 	}
 	return nil

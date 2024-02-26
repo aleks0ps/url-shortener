@@ -14,6 +14,10 @@ import (
 )
 
 func newDBStorage(ctx context.Context, opts *config.Config, logger *zap.SugaredLogger) *storage.PGURLStorage {
+	if len(opts.DatabaseDSN) == 0 {
+		logger.Warnln("DATABASE_DSN is empty")
+		return nil
+	}
 	db, err := storage.PGNewURLStorage(ctx, opts.DatabaseDSN, logger)
 	if err != nil {
 		return nil

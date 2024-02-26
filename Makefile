@@ -21,6 +21,8 @@ SERVER_PORT := 8080
 export SERVER_PORT
 
 export DATABASE_DSN := postgres://url-shortener:url-shortener@localhost:5432/url-shortener?sslmode=disable
+env:
+	echo "export DATABASE_DSN=$(DATABASE_DSN)" > .$@
 
 .PHONY: test
 test: build
