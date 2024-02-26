@@ -16,7 +16,6 @@ import (
 func newDBStorage(ctx context.Context, opts *config.Config, logger *zap.SugaredLogger) *storage.PGURLStorage {
 	db, err := storage.PGNewURLStorage(ctx, opts.DatabaseDSN, logger)
 	if err != nil {
-		logger.Infoln(err)
 		return nil
 	}
 	return db
