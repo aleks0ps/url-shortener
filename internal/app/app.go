@@ -20,6 +20,7 @@ func newDBStorage(ctx context.Context, opts *config.Config, logger *zap.SugaredL
 	}
 	db, err := storage.PGNewURLStorage(ctx, opts.DatabaseDSN, logger)
 	if err != nil {
+		logger.Errorln(err)
 		return nil
 	}
 	return db
