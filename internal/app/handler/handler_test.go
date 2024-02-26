@@ -38,7 +38,7 @@ func TestShortenURL(t *testing.T) {
 	var storageURLs Storager
 	db := storage.PGNewURLStorage(ctx, databaseDSN, sugar)
 	mem := storage.NewURLStorage(storagePath, sugar)
-	if db.IsReady() {
+	if db != nil {
 		storageURLs = db
 	} else {
 		storageURLs = mem
@@ -88,7 +88,7 @@ func TestGetOrigURL(t *testing.T) {
 	var storageURLs Storager
 	db := storage.PGNewURLStorage(ctx, databaseDSN, sugar)
 	mem := storage.NewURLStorage(storagePath, sugar)
-	if db.IsReady() {
+	if db != nil {
 		storageURLs = db
 	} else {
 		storageURLs = mem

@@ -42,20 +42,11 @@ func PGNewURLStorage(ctx context.Context, databaseDSN string, s *zap.SugaredLogg
 		tmpDBInit(ctx, db, s)
 		return &PGURLStorage{DB: db, logger: s}
 	}
-	return &PGURLStorage{DB: nil, logger: s}
-}
-
-func (p *PGURLStorage) IsReady() bool {
-	return p.DB != nil
+	return nil
 }
 
 func (p *PGURLStorage) StoreBatch(ctx context.Context, URLs map[string]*URLRecord) (map[string]*URLRecord, bool, error) {
 	origURLs := make(map[string]*URLRecord)
-	if !p.IsReady() {
-		err := errors.New("no connection to database")
-		p.logger.Errorln(err.Error())
-		return origURLs, false, err
-	}
 	tx, err := p.DB.Begin(ctx)
 	if err != nil {
 		p.logger.Errorln(err.Error())
@@ -90,11 +81,6 @@ func (p *PGURLStorage) StoreBatch(ctx context.Context, URLs map[string]*URLRecor
 }
 
 func (p *PGURLStorage) Store(ctx context.Context, key string, origURL string) (origKey string, exist bool, e error) {
-	if !p.IsReady() {
-		err := errors.New("no connection to database")
-		p.logger.Errorln(err.Error())
-		return "", false, err
-	}
 	if _, err := p.DB.Exec(ctx, `insert into urls(short_url, original_url) values ($1,$2)`, key, origURL); err != nil {
 		p.logger.Errorln(err.Error())
 		var pgErr *pgconn.PgError
@@ -114,11 +100,6 @@ func (p *PGURLStorage) Store(ctx context.Context, key string, origURL string) (o
 
 func (p *PGURLStorage) Load(ctx context.Context, key string) (string, bool, error) {
 	var URL string
-	if !p.IsReady() {
-		err := errors.New("no connection to database")
-		p.logger.Errorln(err.Error())
-		return "", false, err
-	}
 	err := p.DB.QueryRow(ctx, "select original_url from urls where short_url=$1", key).Scan(&URL)
 	if err != nil {
 		p.logger.Errorln(err.Error())
