@@ -40,7 +40,17 @@ func PGNewURLStorage(ctx context.Context, databaseDSN string, s *zap.SugaredLogg
 		s.Errorln("Unable to create connection pool:", err)
 		return nil, err
 	}
-	_ = tmpDBInit(ctx, db, s)
+	err = tmpDBInit(ctx, db, s)
+	if err != nil {
+		s.Errorln(err)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			// not DuplicateTable = "42P07"
+			if !pgerrcode.IsSyntaxErrororAccessRuleViolation(pgErr.Code) {
+				return nil, err
+			}
+		}
+	}
 	return &PGURLStorage{DB: db, logger: s}, nil
 }
 
