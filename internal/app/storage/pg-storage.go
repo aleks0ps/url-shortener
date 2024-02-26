@@ -45,11 +45,12 @@ func PGNewURLStorage(ctx context.Context, databaseDSN string, s *zap.SugaredLogg
 		s.Errorln(err)
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
-			// not DuplicateTable = "42P07"
-			if !pgerrcode.IsSyntaxErrororAccessRuleViolation(pgErr.Code) {
-				return nil, err
+			// DuplicateTable = "42P07"
+			if pgerrcode.IsSyntaxErrororAccessRuleViolation(pgErr.Code) {
+				return &PGURLStorage{DB: db, logger: s}, nil
 			}
 		}
+		return nil, err
 	}
 	return &PGURLStorage{DB: db, logger: s}, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/go-resty/resty/v2"
@@ -19,7 +20,7 @@ func TestShortenURL(t *testing.T) {
 	defer cancel()
 	contentType := "text/plain"
 	storagePath := "/tmp/short-url-db.json"
-	databaseDSN := ""
+	databaseDSN := os.Getenv("DATABASE_DSN")
 	testCases := []struct {
 		method       string
 		body         string
@@ -70,7 +71,7 @@ func TestGetOrigURL(t *testing.T) {
 	defer cancel()
 	contentType := "text/plain"
 	storagePath := "/tmp/short-url-db.json"
-	databaseDSN := ""
+	databaseDSN := os.Getenv("DATABASE_DSN")
 	urls := []struct {
 		key     string
 		origURL string
