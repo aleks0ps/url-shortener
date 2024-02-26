@@ -19,7 +19,7 @@ import (
 func TestShortenURL(t *testing.T) {
 	contentType := "text/plain"
 	storagePath := "/tmp/short-url-db.json"
-	var databaseDSN string = os.Getenv("DATABASE_DSN")
+	databaseDSN := os.Getenv("DATABASE_DSN")
 	testCases := []struct {
 		method       string
 		body         string
@@ -35,8 +35,7 @@ func TestShortenURL(t *testing.T) {
 	}
 	defer logger.Sync()
 	sugar := logger.Sugar()
-	var storageURLs Storager
-	storageURLs = storage.NewURLStorage(storagePath, sugar)
+	storageURLs := storage.NewURLStorage(storagePath, sugar)
 	rt := Runtime{
 		BaseURL:       "http://localhost:8080",
 		ListenAddress: "",
@@ -65,7 +64,7 @@ func TestGetOrigURL(t *testing.T) {
 	defer cancel()
 	contentType := "text/plain"
 	storagePath := "/tmp/short-url-db.json"
-	var databaseDSN string = os.Getenv("DATABASE_DSN")
+	databaseDSN := os.Getenv("DATABASE_DSN")
 	urls := []struct {
 		key     string
 		origURL string
@@ -79,8 +78,7 @@ func TestGetOrigURL(t *testing.T) {
 	}
 	defer logger.Sync()
 	sugar := logger.Sugar()
-	var storageURLs Storager
-	storageURLs = storage.NewURLStorage(storagePath, sugar)
+	storageURLs := storage.NewURLStorage(storagePath, sugar)
 	rt := Runtime{
 		BaseURL:       "http://localhost:8080",
 		ListenAddress: "",
