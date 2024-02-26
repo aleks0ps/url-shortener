@@ -68,7 +68,7 @@ conflict:
 up:
 	sudo docker compose up -d
 	while ! pg_isready -q -h localhost; do true; done
-	psql "$(DATABASE_DSN)" -f db/urls_table.sql
+	#psql "$(DATABASE_DSN)" -f db/urls_table.sql
 
 down:
 	sudo docker compose down

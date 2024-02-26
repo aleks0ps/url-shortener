@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,11 +17,9 @@ import (
 )
 
 func TestShortenURL(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.TODO())
-	defer cancel()
 	contentType := "text/plain"
 	storagePath := "/tmp/short-url-db.json"
-	databaseDSN := os.Getenv("DATABASE_DSN")
+	var databaseDSN string = os.Getenv("DATABASE_DSN")
 	testCases := []struct {
 		method       string
 		body         string
@@ -37,12 +36,7 @@ func TestShortenURL(t *testing.T) {
 	defer logger.Sync()
 	sugar := logger.Sugar()
 	var storageURLs Storager
-	db, err := storage.PGNewURLStorage(ctx, databaseDSN, sugar)
-	if err != nil {
-		storageURLs = db
-	} else {
-		storageURLs = storage.NewURLStorage(storagePath, sugar)
-	}
+	storageURLs = storage.NewURLStorage(storagePath, sugar)
 	rt := Runtime{
 		BaseURL:       "http://localhost:8080",
 		ListenAddress: "",
@@ -71,7 +65,7 @@ func TestGetOrigURL(t *testing.T) {
 	defer cancel()
 	contentType := "text/plain"
 	storagePath := "/tmp/short-url-db.json"
-	databaseDSN := os.Getenv("DATABASE_DSN")
+	var databaseDSN string = os.Getenv("DATABASE_DSN")
 	urls := []struct {
 		key     string
 		origURL string
@@ -86,12 +80,7 @@ func TestGetOrigURL(t *testing.T) {
 	defer logger.Sync()
 	sugar := logger.Sugar()
 	var storageURLs Storager
-	db, err := storage.PGNewURLStorage(ctx, databaseDSN, sugar)
-	if err != nil {
-		storageURLs = db
-	} else {
-		storageURLs = storage.NewURLStorage(storagePath, sugar)
-	}
+	storageURLs = storage.NewURLStorage(storagePath, sugar)
 	rt := Runtime{
 		BaseURL:       "http://localhost:8080",
 		ListenAddress: "",
@@ -99,7 +88,10 @@ func TestGetOrigURL(t *testing.T) {
 		URLs:          storageURLs,
 	}
 	for _, url := range urls {
-		_, _, _ = rt.URLs.Store(ctx, url.key, url.origURL)
+		_, _, err := rt.URLs.Store(ctx, url.key, url.origURL)
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 	handler := http.HandlerFunc(rt.GetOrigURL)
 	srv := httptest.NewServer(handler)
