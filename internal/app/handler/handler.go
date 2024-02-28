@@ -140,11 +140,6 @@ func (rt *Runtime) ListURLsJSON(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// No records
-	if len(recList) == 0 {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
 	for _, rec := range recList {
 		shortURL := fmt.Sprintf("%s/%s", rt.BaseURL, rec.ShortKey)
 		recJSON := ResponseJSONRecord{ShortURL: shortURL, OriginalURL: rec.OriginalURL}
@@ -159,7 +154,6 @@ func (rt *Runtime) ListURLsJSON(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.Itoa(len(res)))
 	w.WriteHeader(http.StatusOK)
 	w.Write(res)
-	return
 }
 
 func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
