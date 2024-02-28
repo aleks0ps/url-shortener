@@ -22,6 +22,7 @@ type Storager interface {
 	Load(ctx context.Context, key string) (URL string, ok bool, err error)
 	Store(ctx context.Context, key string, URL string) (origKey string, exist bool, err error)
 	StoreBatch(ctx context.Context, URLs map[string]*storage.URLRecord) (map[string]*storage.URLRecord, bool, error)
+	List(ctx context.Context) ([]*storage.URLRecord, error)
 }
 
 // Service runtime context
@@ -64,6 +65,11 @@ type RequestJSONBatchItem struct {
 type ResponseJSONBatchItem struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
+}
+
+type ResponseJSONRecord struct {
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
 }
 
 var SupportedTypes = []ContentTypes{
@@ -125,6 +131,35 @@ func generateShortKey() string {
 		shortKey[i] = charset[r.Intn(len(charset))]
 	}
 	return string(shortKey)
+}
+
+func (rt *Runtime) ListURLsJSON(w http.ResponseWriter, r *http.Request) {
+	var recListJSON []ResponseJSONRecord
+	recList, err := rt.URLs.List(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// No records
+	if len(recList) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	for _, rec := range recList {
+		shortURL := fmt.Sprintf("%s/%s", rt.BaseURL, rec.ShortKey)
+		recJSON := ResponseJSONRecord{ShortURL: shortURL, OriginalURL: rec.OriginalURL}
+		recListJSON = append(recListJSON, recJSON)
+	}
+	res, err := json.Marshal(recListJSON)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", GetContentTypeName(JSON))
+	w.Header().Set("Content-Length", strconv.Itoa(len(res)))
+	w.WriteHeader(http.StatusOK)
+	w.Write(res)
+	return
 }
 
 func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {

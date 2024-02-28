@@ -48,11 +48,16 @@ test: build
 YA := https://ya.ru
 GOOGLE := https://www.google.com
 SVC := http://localhost:8080
- 
+COOKIE := /tmp/cookie.txt
+
 curl:
-	@curl -X POST -d "url=$(YA)" $(SVC); echo
-	@curl -X POST -d "url=$(GOOGLE)" $(SVC); echo
-	@curl -X POST -H "Content-Type: application/json" -d '{"url":"$(YA)"}' $(SVC)/api/shorten; echo
+	@curl -c $(COOKIE)  -X POST -d "url=$(YA)" $(SVC); echo
+	@curl -c $(COOKIE) -X POST -d "url=$(GOOGLE)" $(SVC); echo
+	@curl -c $(COOKIE) -X POST -H "Content-Type: application/json" -d '{"url":"$(YA)"}' $(SVC)/api/shorten; echo
+
+list:
+	@curl -c $(COOKIE) $(SVC)/api/user/urls; echo
+
 gzip:
 	@echo '{"url":"$(YA)"}' | gzip | curl -v -i --data-binary @- -H "Content-Type: application/json" -H "Content-Encoding: gzip" $(SVC)/api/shorten; echo
 

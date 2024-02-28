@@ -130,3 +130,11 @@ func (u *URLStorage) Load(ctx context.Context, key string) (string, bool, error)
 	URL, ok := u.db[key]
 	return URL, ok, nil
 }
+
+func (u *URLStorage) List(ctx context.Context) ([]*URLRecord, error) {
+	var res []*URLRecord
+	for key, URL := range u.db {
+		res = append(res, &URLRecord{ShortKey: key, OriginalURL: URL})
+	}
+	return res, nil
+}

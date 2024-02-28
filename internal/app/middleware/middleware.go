@@ -4,12 +4,14 @@ import (
 	"compress/gzip"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
 
 	h "github.com/aleks0ps/url-shortener/internal/app/handler"
 	m "github.com/go-chi/chi/middleware"
+	"github.com/golang-jwt/jwt/v4"
 	"go.uber.org/zap"
 )
 
@@ -48,6 +50,151 @@ func DisableDefaultLogger() func(next http.Handler) http.Handler {
 	dummyLogFormatter := m.DefaultLogFormatter{Logger: log.New(dummy, "", log.LstdFlags), NoColor: true}
 	dummyLogger := m.RequestLogger(&dummyLogFormatter)
 	return dummyLogger
+}
+
+type Claims struct {
+	ID string `json:"id"`
+	jwt.RegisteredClaims
+}
+
+const IDLength = 10
+
+var jwtKey = []byte("my_secret_key")
+
+func genUniqID(length uint64) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	uniqID := make([]byte, length)
+	for i := range uniqID {
+		uniqID[i] = charset[r.Intn(len(charset))]
+	}
+	return string(uniqID)
+}
+
+func newToken(expirationTime time.Time) (string, error) {
+	ID := genUniqID(IDLength)
+	claims := &Claims{
+		// generate uniq ID
+		ID: ID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			// In JWT, the expiry time is expressed as unix milliseconds
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		return "", err
+	}
+	return tokenString, nil
+}
+
+func checkToken(tokenStr string) (bool, error) {
+	claims := &Claims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (any, error) {
+		return jwtKey, nil
+	})
+	if err != nil {
+		return false, err
+	}
+	// expired
+	if !token.Valid {
+		return false, nil
+	}
+	return true, nil
+}
+
+func refreshToken(expirationTime time.Time, tokenStr string) (string, bool, error) {
+	claims := &Claims{}
+	_, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (any, error) {
+		return jwtKey, nil
+	})
+	if err != nil {
+		return "", false, err
+	}
+	claims.ExpiresAt = jwt.NewNumericDate(expirationTime)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		return "", false, err
+	}
+	return tokenString, true, nil
+}
+
+func CookieChecker() func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		fnCheckCookie := func(w http.ResponseWriter, r *http.Request) {
+			cookie, err := r.Cookie("token")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusUnauthorized)
+				return
+			}
+			_, err = checkToken(cookie.Value)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusUnauthorized)
+				return
+
+			}
+			next.ServeHTTP(w, r)
+		}
+		return http.HandlerFunc(fnCheckCookie)
+	}
+}
+
+func CookieIssuer() func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		fnCookies := func(w http.ResponseWriter, r *http.Request) {
+			cookie, err := r.Cookie("token")
+			if err != nil {
+				// Add Cookie if does not exists
+				if err == http.ErrNoCookie {
+					expirationTime := time.Now().Add(5 * time.Minute)
+					tokenString, err := newToken(expirationTime)
+					if err != nil {
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+						return
+					}
+					http.SetCookie(w, &http.Cookie{
+						Name:    "token",
+						Value:   tokenString,
+						Expires: expirationTime,
+					})
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+			valid, err := checkToken(cookie.Value)
+			if err != nil {
+				expirationTime := time.Now().Add(5 * time.Minute)
+				tokenString, err := newToken(expirationTime)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				http.SetCookie(w, &http.Cookie{
+					Name:    "token",
+					Value:   tokenString,
+					Expires: expirationTime,
+				})
+
+			}
+			if !valid {
+				expirationTime := time.Now().Add(5 * time.Minute)
+				tokenString, _, err := refreshToken(expirationTime, cookie.Value)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				http.SetCookie(w, &http.Cookie{
+					Name:    "token",
+					Value:   tokenString,
+					Expires: expirationTime,
+				})
+			}
+			next.ServeHTTP(w, r)
+		}
+		return http.HandlerFunc(fnCookies)
+	}
 }
 
 func Logger(s *zap.SugaredLogger) func(next http.Handler) http.Handler {

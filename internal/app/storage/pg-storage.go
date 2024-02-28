@@ -117,3 +117,8 @@ func (p *PGURLStorage) Load(ctx context.Context, key string) (string, bool, erro
 	}
 	return URL, true, nil
 }
+
+func (p *PGURLStorage) List(ctx context.Context) ([]*URLRecord, error) {
+	var res []*URLRecord
+	return res, nil
+}
