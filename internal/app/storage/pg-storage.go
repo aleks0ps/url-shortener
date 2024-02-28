@@ -120,5 +120,25 @@ func (p *PGURLStorage) Load(ctx context.Context, key string) (string, bool, erro
 
 func (p *PGURLStorage) List(ctx context.Context) ([]*URLRecord, error) {
 	var res []*URLRecord
+	var shortKey string
+	var originalURL string
+	rows, err := p.DB.Query(ctx, "select short_url, original_url from urls")
+	if err != nil {
+		p.logger.Errorln(err.Error())
+		return res, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		err := rows.Scan(&shortKey, &originalURL)
+		if err != nil {
+			p.logger.Errorln(err.Error())
+			return res, err
+		}
+		res = append(res, &URLRecord{ShortKey: shortKey, OriginalURL: originalURL})
+	}
+	if err := rows.Err(); err != nil {
+		p.logger.Errorln(err.Error())
+		return res, err
+	}
 	return res, nil
 }

@@ -121,7 +121,7 @@ func refreshToken(expirationTime time.Time, tokenStr string) (string, bool, erro
 	return tokenString, true, nil
 }
 
-func CookieChecker() func(next http.Handler) http.Handler {
+func CookieChecker(s *zap.SugaredLogger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fnCheckCookie := func(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie("token")
@@ -133,7 +133,6 @@ func CookieChecker() func(next http.Handler) http.Handler {
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusUnauthorized)
 				return
-
 			}
 			next.ServeHTTP(w, r)
 		}
@@ -141,7 +140,7 @@ func CookieChecker() func(next http.Handler) http.Handler {
 	}
 }
 
-func CookieIssuer() func(next http.Handler) http.Handler {
+func CookieIssuer(s *zap.SugaredLogger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fnCookies := func(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie("token")
