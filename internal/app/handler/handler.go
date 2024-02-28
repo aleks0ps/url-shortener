@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	mycookie "github.com/aleks0ps/url-shortener/internal/app/cookie"
 	"github.com/aleks0ps/url-shortener/internal/app/storage"
 	"github.com/jackc/pgx/v4"
 )
@@ -22,7 +24,9 @@ type Storager interface {
 	Load(ctx context.Context, key string) (URL string, ok bool, err error)
 	Store(ctx context.Context, key string, URL string) (origKey string, exist bool, err error)
 	StoreBatch(ctx context.Context, URLs map[string]*storage.URLRecord) (map[string]*storage.URLRecord, bool, error)
-	List(ctx context.Context) ([]*storage.URLRecord, error)
+	// XXX
+	List(ctx context.Context, ID string) ([]*storage.URLRecord, error)
+	StoreR(ctx context.Context, rec *storage.URLRecord) (origRec *storage.URLRecord, exist bool, err error)
 }
 
 // Service runtime context
@@ -133,9 +137,38 @@ func generateShortKey() string {
 	return string(shortKey)
 }
 
+func newCookie(w *http.ResponseWriter) map[string]string {
+	res := make(map[string]string)
+	expirationTime := time.Now().Add(5 * time.Minute)
+	tokenString, claims, err := mycookie.NewToken(expirationTime)
+	if err != nil {
+		http.Error(*w, err.Error(), http.StatusInternalServerError)
+		return nil
+	}
+	http.SetCookie(*w, &http.Cookie{
+		Name:    "token",
+		Value:   tokenString,
+		Expires: expirationTime,
+	})
+	http.SetCookie(*w, &http.Cookie{
+		Name:    "id",
+		Value:   claims.ID,
+		Expires: expirationTime,
+	})
+	res["id"] = (*claims).ID
+	res["token"] = tokenString
+	return res
+}
+
 func (rt *Runtime) ListURLsJSON(w http.ResponseWriter, r *http.Request) {
 	var recListJSON []ResponseJSONRecord
-	recList, err := rt.URLs.List(r.Context())
+	userID, ok, _ := getCookie(r, "id")
+	if !ok {
+		err := errors.New("Cookie paramter `id` is not set")
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	recList, err := rt.URLs.List(r.Context(), userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -157,10 +190,16 @@ func (rt *Runtime) ListURLsJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
+	myCookies := make(map[string]string)
 	contentType := r.Header.Get("Content-Type")
 	if GetContentTypeCode(contentType) != JSON {
 		w.WriteHeader(http.StatusBadRequest)
 		return
+	}
+	userID, ok, _ := getCookie(r, "id")
+	if !ok {
+		myCookies = newCookie(&w)
+		userID = myCookies["id"]
 	}
 	// JSON
 	var reqJSONBatch []RequestJSONBatchItem
@@ -181,7 +220,7 @@ func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 	}
 	URLs := make(map[string]*storage.URLRecord)
 	for _, req := range reqJSONBatch {
-		URLrec := storage.URLRecord{ShortKey: generateShortKey(), OriginalURL: req.OriginalURL}
+		URLrec := storage.URLRecord{ShortKey: generateShortKey(), OriginalURL: req.OriginalURL, UserID: userID}
 		URLs[req.CorrelationID] = &URLrec
 	}
 	origURLs, exist, _ := rt.URLs.StoreBatch(r.Context(), URLs)
@@ -220,10 +259,16 @@ func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
+	myCookies := make(map[string]string)
 	contentType := r.Header.Get("Content-Type")
 	if GetContentTypeCode(contentType) != JSON {
 		w.WriteHeader(http.StatusBadRequest)
 		return
+	}
+	userID, ok, _ := getCookie(r, "id")
+	if !ok {
+		myCookies = newCookie(&w)
+		userID = myCookies["id"]
 	}
 	// JSON
 	var reqJSON RequestJSON
@@ -243,10 +288,10 @@ func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	shortKey := generateShortKey()
-	uniqKey, exist, _ := rt.URLs.Store(r.Context(), shortKey, reqJSON.URL)
+	origRec, exist, _ := rt.URLs.StoreR(r.Context(), &storage.URLRecord{ShortKey: shortKey, OriginalURL: reqJSON.URL, UserID: userID})
 	if exist {
 		// return uniq short key
-		shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, uniqKey)
+		shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, origRec.ShortKey)
 		resJSON.Result = shortenedURL
 		res, err := json.Marshal(resJSON)
 		if err != nil {
@@ -273,9 +318,23 @@ func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 	w.Write(res)
 }
 
+func getCookie(r *http.Request, name string) (string, bool, error) {
+	cookie, err := r.Cookie(name)
+	if err != nil {
+		return "", false, err
+	}
+	return cookie.Value, true, nil
+}
+
 // Send response to POST requests
 func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
+	myCookies := make(map[string]string)
 	contentType := r.Header.Get("Content-Type")
+	userID, ok, _ := getCookie(r, "id")
+	if !ok {
+		myCookies = newCookie(&w)
+		userID = myCookies["id"]
+	}
 	if GetContentTypeCode(contentType) == URLEncoded {
 		r.ParseForm()
 		origURL := strings.Join(r.PostForm["url"], "")
@@ -284,9 +343,9 @@ func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		shortKey := generateShortKey()
-		uniqKey, exist, _ := rt.URLs.Store(r.Context(), shortKey, string(origURL))
+		res, exist, _ := rt.URLs.StoreR(r.Context(), &storage.URLRecord{ShortKey: shortKey, OriginalURL: string(origURL), UserID: userID})
 		if exist {
-			shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, uniqKey)
+			shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, res.ShortKey)
 			w.Header().Set("Content-Type", GetContentTypeName(PlainText))
 			w.Header().Set("Content-Length", strconv.Itoa(len(shortenedURL)))
 			w.WriteHeader(http.StatusConflict)
@@ -306,9 +365,9 @@ func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 		shortKey := generateShortKey()
-		uniqKey, exist, _ := rt.URLs.Store(r.Context(), shortKey, string(origURL))
+		res, exist, _ := rt.URLs.StoreR(r.Context(), &storage.URLRecord{ShortKey: shortKey, OriginalURL: string(origURL), UserID: userID})
 		if exist {
-			shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, uniqKey)
+			shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, res.ShortKey)
 			w.Header().Set("Content-Type", GetContentTypeName(PlainText))
 			w.Header().Set("Content-Length", strconv.Itoa(len(shortenedURL)))
 			w.WriteHeader(http.StatusConflict)

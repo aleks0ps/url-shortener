@@ -93,6 +93,17 @@ func (u *URLStorage) StoreBatch(ctx context.Context, URLs map[string]*URLRecord)
 
 }
 
+func (u *URLStorage) StoreR(ctx context.Context, rec *URLRecord) (*URLRecord, bool, error) {
+	var res URLRecord
+	origKey, exist, err := u.Store(ctx, rec.ShortKey, rec.OriginalURL)
+	if err != nil {
+		return nil, exist, err
+	}
+	res.ShortKey = origKey
+	res.OriginalURL = rec.OriginalURL
+	return &res, exist, nil
+}
+
 func (u *URLStorage) Store(ctx context.Context, key string, URL string) (string, bool, error) {
 	// return original key
 	oKey, dup := u.isDuplicate(ctx, URL)
@@ -131,7 +142,7 @@ func (u *URLStorage) Load(ctx context.Context, key string) (string, bool, error)
 	return URL, ok, nil
 }
 
-func (u *URLStorage) List(ctx context.Context) ([]*URLRecord, error) {
+func (u *URLStorage) List(ctx context.Context, ID string) ([]*URLRecord, error) {
 	var res []*URLRecord
 	for key, URL := range u.db {
 		res = append(res, &URLRecord{ShortKey: key, OriginalURL: URL})

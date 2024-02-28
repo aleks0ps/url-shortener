@@ -50,22 +50,24 @@ YA := https://ya.ru
 GOOGLE := https://www.google.com
 SVC := http://localhost:8080
 COOKIE := /tmp/cookie.txt
+ID=Alexey
 
 curl:
-	@curl -c $(COOKIE)  -X POST -d "url=$(YA)" $(SVC); echo
-	@curl -c $(COOKIE) -X POST -d "url=$(GOOGLE)" $(SVC); echo
-	@curl -c $(COOKIE) -X POST -H "Content-Type: application/json" -d '{"url":"$(YA)"}' $(SVC)/api/shorten; echo
+	@curl --cookie "id=$(ID)" -X POST -d "url=$(YA)" $(SVC); echo
+	@curl -X POST -d "url=$(GOOGLE)" $(SVC); echo
+	#@curl --cookie "id=$(ID)" -X POST -H "Content-Type: application/json" -d '{"url":"$(YA)"}' $(SVC)/api/shorten; echo
 
 list:
-	@curl -c $(COOKIE) $(SVC)/api/user/urls; echo
+	@curl --cookie "id=$(ID)" $(SVC)/api/user/urls; echo
+	@curl --cookie "token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkxPMk83cUN3bUIiLCJleHAiOjE3MDkxNTUwMzJ9.WjZe8SBjR9Jwp4HYvn74Dh9vEG2dsWBpcB0G5YzEi2A; id=LO2O7qCwmB" $(SVC)/api/user/urls; echo
 
 gzip:
 	@echo '{"url":"$(YA)"}' | gzip | curl -v -i --data-binary @- -H "Content-Type: application/json" -H "Content-Encoding: gzip" $(SVC)/api/shorten; echo
 
 batch:
-	@echo '[{"correlation_id":"1","original_url":"$(YA)"}]' | curl -X POST -v -i --data-binary @- -H "Content-Type: application/json" $(SVC)/api/shorten/batch; echo
+	@echo '[{"correlation_id":"1","original_url":"http://vz.ru"}]' | curl --cookie "id=$(ID)" -X POST -v -i --data-binary @- -H "Content-Type: application/json" $(SVC)/api/shorten/batch; echo
 	@echo '[{"correlation_id":"1","original_url":"$(YA)"},{"correlation_id":"2","original_url":"$(GOOGLE)"}]' | \
-		curl -X POST -v -i --data-binary @- -H "Content-Type: application/json" $(SVC)/api/shorten/batch; echo
+		curl --cookie "id=$(ID) "-X POST -v -i --data-binary @- -H "Content-Type: application/json" $(SVC)/api/shorten/batch; echo
 
 conflict:
 	@curl -X POST -H "Content-Type: application/json" -d '{"url":"$(YA)"}' $(SVC)/api/shorten; echo
