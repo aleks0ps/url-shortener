@@ -196,11 +196,12 @@ func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userID, ok, _ := getCookie(r, "id")
+	myCookies := make(map[string]string)
 	if !ok {
-		myCookies := make(map[string]string)
 		myCookies = newCookie(&w)
 		userID = myCookies["id"]
 	}
+	_ = myCookies
 	// JSON
 	var reqJSONBatch []RequestJSONBatchItem
 	var resJSONBatch []ResponseJSONBatchItem
@@ -265,11 +266,12 @@ func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userID, ok, _ := getCookie(r, "id")
+	myCookies := make(map[string]string)
 	if !ok {
-		myCookies := make(map[string]string)
 		myCookies = newCookie(&w)
 		userID = myCookies["id"]
 	}
+	_ = myCookies
 	// JSON
 	var reqJSON RequestJSON
 	var resJSON ResponseJSON
@@ -330,11 +332,12 @@ func getCookie(r *http.Request, name string) (string, bool, error) {
 func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	userID, ok, _ := getCookie(r, "id")
+	myCookies := make(map[string]string)
 	if !ok {
-		myCookies := make(map[string]string)
 		myCookies = newCookie(&w)
 		userID = myCookies["id"]
 	}
+	_ = myCookies
 	if GetContentTypeCode(contentType) == URLEncoded {
 		r.ParseForm()
 		origURL := strings.Join(r.PostForm["url"], "")
