@@ -164,7 +164,7 @@ func (rt *Runtime) ListURLsJSON(w http.ResponseWriter, r *http.Request) {
 	var recListJSON []ResponseJSONRecord
 	userID, ok, _ := getCookie(r, "id")
 	if !ok {
-		err := errors.New("Cookie paramter `id` is not set")
+		err := errors.New("cookie paramter `id` is not set")
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
@@ -190,7 +190,6 @@ func (rt *Runtime) ListURLsJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
-	myCookies := make(map[string]string)
 	contentType := r.Header.Get("Content-Type")
 	if GetContentTypeCode(contentType) != JSON {
 		w.WriteHeader(http.StatusBadRequest)
@@ -198,6 +197,7 @@ func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 	}
 	userID, ok, _ := getCookie(r, "id")
 	if !ok {
+		myCookies := make(map[string]string)
 		myCookies = newCookie(&w)
 		userID = myCookies["id"]
 	}
@@ -259,7 +259,6 @@ func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
-	myCookies := make(map[string]string)
 	contentType := r.Header.Get("Content-Type")
 	if GetContentTypeCode(contentType) != JSON {
 		w.WriteHeader(http.StatusBadRequest)
@@ -267,6 +266,7 @@ func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	userID, ok, _ := getCookie(r, "id")
 	if !ok {
+		myCookies := make(map[string]string)
 		myCookies = newCookie(&w)
 		userID = myCookies["id"]
 	}
@@ -328,10 +328,10 @@ func getCookie(r *http.Request, name string) (string, bool, error) {
 
 // Send response to POST requests
 func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
-	myCookies := make(map[string]string)
 	contentType := r.Header.Get("Content-Type")
 	userID, ok, _ := getCookie(r, "id")
 	if !ok {
+		myCookies := make(map[string]string)
 		myCookies = newCookie(&w)
 		userID = myCookies["id"]
 	}
