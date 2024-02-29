@@ -90,7 +90,6 @@ func (u *URLStorage) StoreBatch(ctx context.Context, URLs map[string]*URLRecord)
 		}
 	}
 	return origRecs, false, nil
-
 }
 
 func (u *URLStorage) Store(ctx context.Context, rec *URLRecord) (*URLRecord, bool, error) {
