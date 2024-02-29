@@ -65,12 +65,9 @@ func TestGetOrigURL(t *testing.T) {
 	contentType := "text/plain"
 	storagePath := "/tmp/short-url-db.json"
 	databaseDSN := os.Getenv("DATABASE_DSN")
-	urls := []struct {
-		key     string
-		origURL string
-	}{
-		{key: "qsBVYP", origURL: "https://ya.ru"},
-		{key: "35D0WW", origURL: "https://google.com"},
+	urls := []storage.URLRecord{
+		{ShortKey: "qsBVYP", OriginalURL: "https://ya.ru", UserID: "User1"},
+		{ShortKey: "35D0WW", OriginalURL: "https://google.com", UserID: "User2"},
 	}
 	logger, err := zap.NewDevelopment()
 	if err != nil {
@@ -86,8 +83,9 @@ func TestGetOrigURL(t *testing.T) {
 		URLs:          storageURLs,
 	}
 	for _, url := range urls {
-		_, _, err := rt.URLs.Store(ctx, url.key, url.origURL)
+		_, _, err := rt.URLs.Store(ctx, &url)
 		if err != nil {
+			fmt.Println("STORE ERROR!!")
 			fmt.Println(err)
 		}
 	}
@@ -100,8 +98,8 @@ func TestGetOrigURL(t *testing.T) {
 		expectedCode int
 		expectedBody string
 	}{
-		{method: http.MethodGet, body: urls[0].key, expectedCode: http.StatusTemporaryRedirect, expectedBody: urls[0].origURL},
-		{method: http.MethodGet, body: urls[1].key, expectedCode: http.StatusTemporaryRedirect, expectedBody: urls[1].origURL},
+		{method: http.MethodGet, body: urls[0].ShortKey, expectedCode: http.StatusTemporaryRedirect, expectedBody: urls[0].OriginalURL},
+		{method: http.MethodGet, body: urls[1].ShortKey, expectedCode: http.StatusTemporaryRedirect, expectedBody: urls[1].OriginalURL},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.method, func(t *testing.T) {

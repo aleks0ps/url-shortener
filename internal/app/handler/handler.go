@@ -2,7 +2,6 @@ package handler
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,21 +19,12 @@ import (
 
 type ContentType int
 
-type Storager interface {
-	Load(ctx context.Context, key string) (URL string, ok bool, err error)
-	Store(ctx context.Context, key string, URL string) (origKey string, exist bool, err error)
-	StoreBatch(ctx context.Context, URLs map[string]*storage.URLRecord) (map[string]*storage.URLRecord, bool, error)
-	// XXX
-	List(ctx context.Context, ID string) ([]*storage.URLRecord, error)
-	StoreR(ctx context.Context, rec *storage.URLRecord) (origRec *storage.URLRecord, exist bool, err error)
-}
-
 // Service runtime context
 type Runtime struct {
 	BaseURL       string
 	ListenAddress string
 	DBURL         string
-	URLs          Storager
+	URLs          storage.Storager
 }
 
 const (
@@ -290,7 +280,7 @@ func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	shortKey := generateShortKey()
-	origRec, exist, _ := rt.URLs.StoreR(r.Context(), &storage.URLRecord{ShortKey: shortKey, OriginalURL: reqJSON.URL, UserID: userID})
+	origRec, exist, _ := rt.URLs.Store(r.Context(), &storage.URLRecord{ShortKey: shortKey, OriginalURL: reqJSON.URL, UserID: userID})
 	if exist {
 		// return uniq short key
 		shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, origRec.ShortKey)
@@ -346,7 +336,7 @@ func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		shortKey := generateShortKey()
-		res, exist, _ := rt.URLs.StoreR(r.Context(), &storage.URLRecord{ShortKey: shortKey, OriginalURL: string(origURL), UserID: userID})
+		res, exist, _ := rt.URLs.Store(r.Context(), &storage.URLRecord{ShortKey: shortKey, OriginalURL: string(origURL), UserID: userID})
 		if exist {
 			shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, res.ShortKey)
 			w.Header().Set("Content-Type", GetContentTypeName(PlainText))
@@ -368,7 +358,7 @@ func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 		shortKey := generateShortKey()
-		res, exist, _ := rt.URLs.StoreR(r.Context(), &storage.URLRecord{ShortKey: shortKey, OriginalURL: string(origURL), UserID: userID})
+		res, exist, _ := rt.URLs.Store(r.Context(), &storage.URLRecord{ShortKey: shortKey, OriginalURL: string(origURL), UserID: userID})
 		if exist {
 			shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, res.ShortKey)
 			w.Header().Set("Content-Type", GetContentTypeName(PlainText))
@@ -388,12 +378,10 @@ func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rt *Runtime) GetOrigURL(w http.ResponseWriter, r *http.Request) {
-	var origURL string
-	var ok bool
 	shortKey := r.URL.RequestURI()[1:]
-	origURL, ok, _ = rt.URLs.Load(r.Context(), shortKey)
+	origRec, ok, _ := rt.URLs.Load(r.Context(), shortKey)
 	if ok {
-		http.Redirect(w, r, origURL, http.StatusTemporaryRedirect)
+		http.Redirect(w, r, origRec.OriginalURL, http.StatusTemporaryRedirect)
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
 	}

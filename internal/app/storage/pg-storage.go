@@ -18,7 +18,7 @@ type PGURLStorage struct {
 func tmpDBInit(ctx context.Context, db *pgxpool.Pool, s *zap.SugaredLogger) error {
 	_, err := db.Exec(ctx, `CREATE TABLE IF NOT EXISTS urls (
 			uuid BIGSERIAL PRIMARY KEY,
-			short_url TEXT NOT NULL,
+			short_key TEXT NOT NULL,
 			original_url TEXT NOT NULL,
 			user_id TEXT NOT NULL);
 			CREATE UNIQUE INDEX uniq_urls ON urls (original_url) NULLS NOT DISTINCT
@@ -65,14 +65,14 @@ func (p *PGURLStorage) StoreBatch(ctx context.Context, URLs map[string]*URLRecor
 	}
 	defer tx.Rollback(ctx)
 	for id, URLrec := range URLs {
-		_, err := tx.Exec(ctx, `insert into urls(short_url, original_url, user_id) values ($1,$2, $3)`, URLrec.ShortKey, URLrec.OriginalURL, URLrec.UserID)
+		_, err := tx.Exec(ctx, `insert into urls(short_key, original_url, user_id) values ($1,$2, $3)`, URLrec.ShortKey, URLrec.OriginalURL, URLrec.UserID)
 		if err != nil {
 			p.logger.Errorln(err.Error())
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) {
 				if pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
 					var origKey string
-					err := p.DB.QueryRow(ctx, "select short_url from urls where original_url=$1", URLrec.OriginalURL).Scan(&origKey)
+					err := p.DB.QueryRow(ctx, "select short_key from urls where original_url=$1", URLrec.OriginalURL).Scan(&origKey)
 					if err != nil {
 						p.logger.Errorln(err.Error())
 						return origURLs, true, err
@@ -91,15 +91,15 @@ func (p *PGURLStorage) StoreBatch(ctx context.Context, URLs map[string]*URLRecor
 	return origURLs, false, nil
 }
 
-func (p *PGURLStorage) StoreR(ctx context.Context, rec *URLRecord) (origRec *URLRecord, exist bool, e error) {
+func (p *PGURLStorage) Store(ctx context.Context, rec *URLRecord) (origRec *URLRecord, exist bool, e error) {
 	var res URLRecord
-	if _, err := p.DB.Exec(ctx, `insert into urls(short_url, original_url, user_id) values ($1,$2,$3)`, rec.ShortKey, rec.OriginalURL, rec.UserID); err != nil {
+	if _, err := p.DB.Exec(ctx, `insert into urls(short_key, original_url, user_id) values ($1,$2,$3)`, rec.ShortKey, rec.OriginalURL, rec.UserID); err != nil {
 		p.logger.Errorln(err.Error())
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			if pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
 				var origKey string
-				err := p.DB.QueryRow(ctx, "select short_url from urls where original_url=$1", rec.OriginalURL).Scan(&origKey)
+				err := p.DB.QueryRow(ctx, "select short_key from urls where original_url=$1", rec.OriginalURL).Scan(&origKey)
 				if err != nil {
 					p.logger.Errorln(err.Error())
 					return nil, false, err
@@ -114,32 +114,14 @@ func (p *PGURLStorage) StoreR(ctx context.Context, rec *URLRecord) (origRec *URL
 	return nil, false, nil
 }
 
-func (p *PGURLStorage) Store(ctx context.Context, key string, origURL string) (origKey string, exist bool, e error) {
-	if _, err := p.DB.Exec(ctx, `insert into urls(short_url, original_url) values ($1,$2)`, key, origURL); err != nil {
-		p.logger.Errorln(err.Error())
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			if pgerrcode.IsIntegrityConstraintViolation(pgErr.Code) {
-				err := p.DB.QueryRow(ctx, "select short_url from urls where original_url=$1", origURL).Scan(&origKey)
-				if err != nil {
-					p.logger.Errorln(err.Error())
-					return "", false, err
-				}
-				return origKey, true, err
-			}
-		}
-	}
-	return "", false, nil
-}
-
-func (p *PGURLStorage) Load(ctx context.Context, key string) (string, bool, error) {
-	var URL string
-	err := p.DB.QueryRow(ctx, "select original_url from urls where short_url=$1", key).Scan(&URL)
+func (p *PGURLStorage) Load(ctx context.Context, key string) (URLRecord, bool, error) {
+	var rec URLRecord
+	err := p.DB.QueryRow(ctx, "select short_key,original_url,user_id from urls where short_key=$1", key).Scan(&rec.ShortKey, &rec.OriginalURL, &rec.UserID)
 	if err != nil {
 		p.logger.Errorln(err.Error())
-		return "", false, err
+		return URLRecord{}, false, err
 	}
-	return URL, true, nil
+	return rec, true, nil
 }
 
 func (p *PGURLStorage) List(ctx context.Context, ID string) ([]*URLRecord, error) {
@@ -147,7 +129,7 @@ func (p *PGURLStorage) List(ctx context.Context, ID string) ([]*URLRecord, error
 	var shortKey string
 	var originalURL string
 	var userID string
-	rows, err := p.DB.Query(ctx, "select short_url, original_url, user_id from urls")
+	rows, err := p.DB.Query(ctx, "select short_key, original_url, user_id from urls")
 	if err != nil {
 		p.logger.Errorln(err.Error())
 		return res, err

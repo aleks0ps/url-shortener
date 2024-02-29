@@ -10,7 +10,7 @@ import (
 )
 
 type URLStorage struct {
-	db   map[string]string
+	db   map[string]*URLRecord
 	file *os.File
 	// writer
 	writer *bufio.Writer
@@ -20,9 +20,8 @@ type URLStorage struct {
 }
 
 type URLEvent struct {
-	ID  uint   `json:"uuid"`
-	Key string `json:"short_url"`
-	URL string `json:"original_url"`
+	ID uint `json:"uuid"`
+	URLRecord
 }
 
 func NewURLStorage(filename string, s *zap.SugaredLogger) *URLStorage {
@@ -33,7 +32,7 @@ func NewURLStorage(filename string, s *zap.SugaredLogger) *URLStorage {
 			return nil
 		}
 		URLs := URLStorage{
-			db:      make(map[string]string),
+			db:      make(map[string]*URLRecord),
 			file:    file,
 			writer:  bufio.NewWriter(file),
 			scanner: bufio.NewScanner(file),
@@ -42,7 +41,7 @@ func NewURLStorage(filename string, s *zap.SugaredLogger) *URLStorage {
 		return &URLs
 	}
 	// just in-memory storage
-	return &URLStorage{db: make(map[string]string), file: nil, writer: nil, scanner: nil, logger: s}
+	return &URLStorage{db: make(map[string]*URLRecord), file: nil, writer: nil, scanner: nil, logger: s}
 }
 
 func (u *URLStorage) LoadFromFile(ctx context.Context) {
@@ -67,85 +66,82 @@ func (u *URLStorage) LoadFromFile(ctx context.Context) {
 			return
 		}
 		// Store URLs to runtime struct
-		u.db[event.Key] = event.URL
+		rec := &event.URLRecord
+		u.db[rec.ShortKey] = rec
 	}
 }
 
-func (u *URLStorage) isDuplicate(ctx context.Context, URL string) (string, bool) {
-	for key, oURL := range u.db {
-		if oURL == URL {
-			return key, true
+func (u *URLStorage) isDuplicate(ctx context.Context, Rec *URLRecord) (URLRecord, bool) {
+	for _, oRec := range u.db {
+		if oRec.OriginalURL == Rec.OriginalURL {
+			return *oRec, true
 		}
 	}
-	return "", false
+	return URLRecord{}, false
 }
 
 func (u *URLStorage) StoreBatch(ctx context.Context, URLs map[string]*URLRecord) (map[string]*URLRecord, bool, error) {
-	origURLs := make(map[string]*URLRecord)
-	for id, URL := range URLs {
-		origKey, exist, err := u.Store(ctx, URL.ShortKey, URL.OriginalURL)
+	origRecs := make(map[string]*URLRecord)
+	for id, Rec := range URLs {
+		origRec, exist, err := u.Store(ctx, Rec)
 		if exist {
-			origURLs[id] = &URLRecord{ShortKey: origKey, OriginalURL: URL.OriginalURL}
-			return origURLs, true, err
+			origRecs[id] = origRec
+			return origRecs, true, err
 		}
 	}
-	return origURLs, false, nil
+	return origRecs, false, nil
 
 }
 
-func (u *URLStorage) StoreR(ctx context.Context, rec *URLRecord) (*URLRecord, bool, error) {
-	var res URLRecord
-	origKey, exist, err := u.Store(ctx, rec.ShortKey, rec.OriginalURL)
-	if err != nil {
-		return nil, exist, err
-	}
-	res.ShortKey = origKey
-	res.OriginalURL = rec.OriginalURL
-	return &res, exist, nil
-}
-
-func (u *URLStorage) Store(ctx context.Context, key string, URL string) (string, bool, error) {
-	// return original key
-	oKey, dup := u.isDuplicate(ctx, URL)
-	if dup {
-		return oKey, dup, nil
-	}
+func (u *URLStorage) Store(ctx context.Context, rec *URLRecord) (*URLRecord, bool, error) {
+	/*
+		// return original key
+		oRec, dup := u.isDuplicate(ctx, rec)
+		if dup {
+			return &oRec, dup, nil
+		}
+	*/
 	// no persistent storage available
 	if u.file == nil || u.writer == nil || u.scanner == nil {
-		u.db[key] = URL
+		u.db[rec.ShortKey] = rec
 	} else {
-		u.db[key] = URL
-		event := URLEvent{ID: uint(len(u.db)), Key: key, URL: URL}
+		u.db[rec.ShortKey] = rec
+		event := URLEvent{ID: uint(len(u.db)), URLRecord: *rec}
 		data, err := json.Marshal(&event)
 		if err != nil {
 			u.logger.Errorln(err.Error())
-			return "", false, err
+			return nil, false, err
 		}
 		if _, err := u.writer.Write(data); err != nil {
 			u.logger.Errorln(err.Error())
-			return "", false, err
+			return nil, false, err
 		}
 		if err := u.writer.WriteByte('\n'); err != nil {
 			u.logger.Errorln(err.Error())
-			return "", false, err
+			return nil, false, err
 		}
 		if err := u.writer.Flush(); err != nil {
 			u.logger.Errorln(os.Stderr, err.Error())
-			return "", false, err
+			return nil, false, err
 		}
 	}
-	return "", false, nil
+	return nil, false, nil
 }
 
-func (u *URLStorage) Load(ctx context.Context, key string) (string, bool, error) {
-	URL, ok := u.db[key]
-	return URL, ok, nil
+func (u *URLStorage) Load(ctx context.Context, key string) (URLRecord, bool, error) {
+	URLrec, ok := u.db[key]
+	if !ok {
+		return URLRecord{}, ok, nil
+	}
+	return *URLrec, ok, nil
 }
 
 func (u *URLStorage) List(ctx context.Context, ID string) ([]*URLRecord, error) {
 	var res []*URLRecord
-	for key, URL := range u.db {
-		res = append(res, &URLRecord{ShortKey: key, OriginalURL: URL})
+	for _, URLrec := range u.db {
+		if URLrec.UserID == ID {
+			res = append(res, URLrec)
+		}
 	}
 	return res, nil
 }

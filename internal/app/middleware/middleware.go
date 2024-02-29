@@ -50,32 +50,6 @@ func DisableDefaultLogger() func(next http.Handler) http.Handler {
 	return dummyLogger
 }
 
-/*
-	func CookieIssuer(s *zap.SugaredLogger) func(next http.Handler) http.Handler {
-		return func(next http.Handler) http.Handler {
-			fnCookies := func(w http.ResponseWriter, r *http.Request) {
-				expirationTime := time.Now().Add(5 * time.Minute)
-				tokenString, claims, err := newToken(expirationTime)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				http.SetCookie(w, &http.Cookie{
-					Name:    "token",
-					Value:   tokenString,
-					Expires: expirationTime,
-				})
-				http.SetCookie(w, &http.Cookie{
-					Name:    "id",
-					Value:   claims.ID,
-					Expires: expirationTime,
-				})
-				next.ServeHTTP(w, r)
-			}
-			return http.HandlerFunc(fnCookies)
-		}
-	}
-*/
 func Logger(s *zap.SugaredLogger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fnLog := func(w http.ResponseWriter, r *http.Request) {

@@ -29,7 +29,7 @@ func newMemStorage(ctx context.Context, opts *config.Config, logger *zap.Sugared
 }
 
 func Run() {
-	var storage handler.Storager
+	var storage storage.Storager
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	logger, err := zap.NewDevelopment()
