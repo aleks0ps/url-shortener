@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -28,7 +27,7 @@ type Runtime struct {
 }
 
 const (
-	Unsupported ContentType = iota
+	None ContentType = iota
 	PlainText
 	URLEncoded
 	JSON
@@ -103,7 +102,7 @@ func GetContentTypeCode(name string) ContentType {
 			return t.Code
 		}
 	}
-	return Unsupported
+	return None
 }
 
 func GetContentTypeName(code ContentType) string {
@@ -150,39 +149,58 @@ func newCookie(w *http.ResponseWriter) map[string]string {
 	return res
 }
 
+func (rt *Runtime) newShortURL(key string) string {
+	return rt.BaseURL + "/" + key
+}
+
+func writeResponse(w *http.ResponseWriter, t ContentType, status int, data []byte) {
+	switch t {
+	case None:
+		(*w).WriteHeader(status)
+		if data != nil {
+			(*w).Write(data)
+		}
+	default:
+		(*w).Header().Set("Content-Type", GetContentTypeName(t))
+		(*w).Header().Set("Content-Length", strconv.Itoa(len(data)))
+		(*w).WriteHeader(status)
+		(*w).Write(data)
+	}
+}
+
+func writeError(w *http.ResponseWriter, status int, err error) {
+	http.Error(*w, err.Error(), status)
+}
+
 func (rt *Runtime) ListURLsJSON(w http.ResponseWriter, r *http.Request) {
 	var recListJSON []ResponseJSONRecord
 	userID, ok, _ := getCookie(r, "id")
 	if !ok {
 		err := errors.New("cookie paramter `id` is not set")
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		writeError(&w, http.StatusUnauthorized, err)
 		return
 	}
 	recList, err := rt.URLs.List(r.Context(), userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(&w, http.StatusInternalServerError, err)
 		return
 	}
 	for _, rec := range recList {
-		shortURL := fmt.Sprintf("%s/%s", rt.BaseURL, rec.ShortKey)
-		recJSON := ResponseJSONRecord{ShortURL: shortURL, OriginalURL: rec.OriginalURL}
+		recJSON := ResponseJSONRecord{ShortURL: rt.newShortURL(rec.ShortKey), OriginalURL: rec.OriginalURL}
 		recListJSON = append(recListJSON, recJSON)
 	}
 	res, err := json.Marshal(recListJSON)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(&w, http.StatusInternalServerError, err)
 		return
 	}
-	w.Header().Set("Content-Type", GetContentTypeName(JSON))
-	w.Header().Set("Content-Length", strconv.Itoa(len(res)))
-	w.WriteHeader(http.StatusOK)
-	w.Write(res)
+	writeResponse(&w, JSON, http.StatusOK, res)
 }
 
 func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	if GetContentTypeCode(contentType) != JSON {
-		w.WriteHeader(http.StatusBadRequest)
+		writeResponse(&w, None, http.StatusBadRequest, nil)
 		return
 	}
 	userID, ok, _ := getCookie(r, "id")
@@ -198,11 +216,11 @@ func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(&w, http.StatusBadRequest, err)
 		return
 	}
 	if err := json.Unmarshal(buf.Bytes(), &reqJSONBatch); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(&w, http.StatusBadRequest, err)
 		return
 	}
 	if len(reqJSONBatch) == 0 {
@@ -217,42 +235,33 @@ func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 	origURLs, exist, _ := rt.URLs.StoreBatch(r.Context(), URLs)
 	if exist {
 		for id, URLrec := range origURLs {
-			shortURL := fmt.Sprintf("%s/%s", rt.BaseURL, URLrec.ShortKey)
-			resConflict := ResponseJSONBatchItem{CorrelationID: id, ShortURL: shortURL}
+			resConflict := ResponseJSONBatchItem{CorrelationID: id, ShortURL: rt.newShortURL(URLrec.ShortKey)}
 			resJSONBatch = append(resJSONBatch, resConflict)
 		}
 		res, err := json.Marshal(resJSONBatch)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(&w, http.StatusInternalServerError, err)
 			return
 		}
-		w.Header().Set("Content-Type", GetContentTypeName(JSON))
-		w.Header().Set("Content-Length", strconv.Itoa(len(res)))
-		w.WriteHeader(http.StatusConflict)
-		w.Write(res)
+		writeResponse(&w, JSON, http.StatusConflict, res)
 		return
 	}
 	for id, URLrec := range URLs {
-		shortURL := fmt.Sprintf("%s/%s", rt.BaseURL, URLrec.ShortKey)
-		res := ResponseJSONBatchItem{CorrelationID: id, ShortURL: shortURL}
+		res := ResponseJSONBatchItem{CorrelationID: id, ShortURL: rt.newShortURL(URLrec.ShortKey)}
 		resJSONBatch = append(resJSONBatch, res)
 	}
 	res, err := json.Marshal(resJSONBatch)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(&w, http.StatusInternalServerError, err)
 		return
 	}
-	w.Header().Set("Content-Type", GetContentTypeName(JSON))
-	w.Header().Set("Content-Length", strconv.Itoa(len(res)))
-	// 201
-	w.WriteHeader(http.StatusCreated)
-	w.Write(res)
+	writeResponse(&w, JSON, http.StatusCreated, res)
 }
 
 func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	if GetContentTypeCode(contentType) != JSON {
-		w.WriteHeader(http.StatusBadRequest)
+		writeResponse(&w, None, http.StatusBadRequest, nil)
 		return
 	}
 	userID, ok, _ := getCookie(r, "id")
@@ -268,46 +277,37 @@ func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(&w, http.StatusBadRequest, err)
 		return
 	}
 	if err := json.Unmarshal(buf.Bytes(), &reqJSON); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(&w, http.StatusBadRequest, err)
 		return
 	}
 	if len(reqJSON.URL) == 0 {
-		w.WriteHeader(http.StatusBadRequest)
+		writeResponse(&w, None, http.StatusBadRequest, nil)
 		return
 	}
 	shortKey := generateShortKey()
 	origRec, exist, _ := rt.URLs.Store(r.Context(), &storage.URLRecord{ShortKey: shortKey, OriginalURL: reqJSON.URL, UserID: userID})
 	if exist {
 		// return uniq short key
-		shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, origRec.ShortKey)
-		resJSON.Result = shortenedURL
+		resJSON.Result = rt.newShortURL(origRec.ShortKey)
 		res, err := json.Marshal(resJSON)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(&w, http.StatusInternalServerError, err)
 			return
 		}
-		w.Header().Set("Content-Type", GetContentTypeName(JSON))
-		w.Header().Set("Content-Length", strconv.Itoa(len(res)))
-		w.WriteHeader(http.StatusConflict)
-		w.Write(res)
+		writeResponse(&w, JSON, http.StatusConflict, res)
 		return
 	}
-	shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, shortKey)
-	resJSON.Result = shortenedURL
+	resJSON.Result = rt.newShortURL(shortKey)
 	res, err := json.Marshal(resJSON)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(&w, http.StatusInternalServerError, err)
 		return
 	}
-	w.Header().Set("Content-Type", GetContentTypeName(JSON))
-	w.Header().Set("Content-Length", strconv.Itoa(len(res)))
-	// 201
-	w.WriteHeader(http.StatusCreated)
-	w.Write(res)
+	writeResponse(&w, JSON, http.StatusCreated, res)
 }
 
 func getCookie(r *http.Request, name string) (string, bool, error) {
@@ -332,26 +332,18 @@ func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		origURL := strings.Join(r.PostForm["url"], "")
 		if len(origURL) == 0 {
-			w.WriteHeader(http.StatusBadRequest)
+			writeResponse(&w, None, http.StatusBadRequest, nil)
 			return
 		}
 		shortKey := generateShortKey()
 		res, exist, _ := rt.URLs.Store(r.Context(), &storage.URLRecord{ShortKey: shortKey, OriginalURL: string(origURL), UserID: userID})
 		if exist {
-			shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, res.ShortKey)
-			w.Header().Set("Content-Type", GetContentTypeName(PlainText))
-			w.Header().Set("Content-Length", strconv.Itoa(len(shortenedURL)))
-			w.WriteHeader(http.StatusConflict)
-			w.Write([]byte(shortenedURL))
+			shortenedURL := rt.newShortURL(res.ShortKey)
+			writeResponse(&w, PlainText, http.StatusConflict, []byte(shortenedURL))
 			return
 		}
-		shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, shortKey)
-		// Return url
-		w.Header().Set("Content-Type", GetContentTypeName(PlainText))
-		w.Header().Set("Content-Length", strconv.Itoa(len(shortenedURL)))
-		// 201
-		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(shortenedURL))
+		shortenedURL := rt.newShortURL(shortKey)
+		writeResponse(&w, PlainText, http.StatusCreated, []byte(shortenedURL))
 	} else {
 		origURL, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -360,20 +352,12 @@ func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		shortKey := generateShortKey()
 		res, exist, _ := rt.URLs.Store(r.Context(), &storage.URLRecord{ShortKey: shortKey, OriginalURL: string(origURL), UserID: userID})
 		if exist {
-			shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, res.ShortKey)
-			w.Header().Set("Content-Type", GetContentTypeName(PlainText))
-			w.Header().Set("Content-Length", strconv.Itoa(len(shortenedURL)))
-			w.WriteHeader(http.StatusConflict)
-			w.Write([]byte(shortenedURL))
+			shortenedURL := rt.newShortURL(res.ShortKey)
+			writeResponse(&w, PlainText, http.StatusConflict, []byte(shortenedURL))
 			return
 		}
-		shortenedURL := fmt.Sprintf("%s/%s", rt.BaseURL, shortKey)
-		// Return url
-		w.Header().Set("Content-Type", GetContentTypeName(PlainText))
-		w.Header().Set("Content-Length", strconv.Itoa(len(shortenedURL)))
-		// 201
-		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(shortenedURL))
+		shortenedURL := rt.newShortURL(shortKey)
+		writeResponse(&w, PlainText, http.StatusCreated, []byte(shortenedURL))
 	}
 }
 
@@ -383,17 +367,16 @@ func (rt *Runtime) GetOrigURL(w http.ResponseWriter, r *http.Request) {
 	if ok {
 		http.Redirect(w, r, origRec.OriginalURL, http.StatusTemporaryRedirect)
 	} else {
-		w.WriteHeader(http.StatusBadRequest)
+		writeResponse(&w, None, http.StatusBadRequest, nil)
 	}
 }
 
 func (rt *Runtime) DBIsAlive(w http.ResponseWriter, r *http.Request) {
 	conn, err := pgx.Connect(r.Context(), rt.DBURL)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		writeResponse(&w, None, http.StatusInternalServerError, []byte(err.Error()))
 		return
 	}
 	defer conn.Close(r.Context())
-	w.WriteHeader(http.StatusOK)
+	writeResponse(&w, None, http.StatusOK, nil)
 }
