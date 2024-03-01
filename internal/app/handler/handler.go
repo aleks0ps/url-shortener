@@ -224,7 +224,7 @@ func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(reqJSONBatch) == 0 {
-		w.WriteHeader(http.StatusBadRequest)
+		writeResponse(&w, None, http.StatusBadRequest, nil)
 		return
 	}
 	URLs := make(map[string]*storage.URLRecord)
