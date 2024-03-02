@@ -3,7 +3,6 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io"
 	"math/rand"
 	"net/http"
@@ -126,13 +125,12 @@ func generateShortKey() string {
 	return string(shortKey)
 }
 
-func newCookie(w *http.ResponseWriter) map[string]string {
+func newCookie(w *http.ResponseWriter) (map[string]string, error) {
 	res := make(map[string]string)
 	expirationTime := time.Now().Add(5 * time.Minute)
 	tokenString, claims, err := mycookie.NewToken(expirationTime)
 	if err != nil {
-		http.Error(*w, err.Error(), http.StatusInternalServerError)
-		return nil
+		return nil, err
 	}
 	http.SetCookie(*w, &http.Cookie{
 		Name:    "token",
@@ -146,7 +144,30 @@ func newCookie(w *http.ResponseWriter) map[string]string {
 	})
 	res["id"] = (*claims).ID
 	res["token"] = tokenString
-	return res
+	return res, nil
+}
+
+func getCookie(r *http.Request, name string) (string, error) {
+	cookie, err := r.Cookie(name)
+	if err != nil {
+		return "", err
+	}
+	return cookie.Value, nil
+}
+
+func ensureCookie(w *http.ResponseWriter, r *http.Request, name string) (string, error) {
+	cookieValue, err := getCookie(r, name)
+	if err != nil {
+		// No cookie found
+		// Generate new
+		myCookies, err := newCookie(w)
+		if err != nil {
+			return "", err
+		}
+		cookieValue = myCookies[name]
+	}
+	// return cookie value
+	return cookieValue, nil
 }
 
 func (rt *Runtime) newShortURL(key string) string {
@@ -174,9 +195,9 @@ func writeError(w *http.ResponseWriter, status int, err error) {
 
 func (rt *Runtime) ListURLsJSON(w http.ResponseWriter, r *http.Request) {
 	var recListJSON []ResponseJSONRecord
-	userID, ok, _ := getCookie(r, "id")
-	if !ok {
-		err := errors.New("cookie paramter `id` is not set")
+	// Check Cookie
+	userID, err := getCookie(r, "id")
+	if err != nil {
 		writeError(&w, http.StatusUnauthorized, err)
 		return
 	}
@@ -203,18 +224,17 @@ func (rt *Runtime) ShortenURLJSONBatch(w http.ResponseWriter, r *http.Request) {
 		writeResponse(&w, None, http.StatusBadRequest, nil)
 		return
 	}
-	userID, ok, _ := getCookie(r, "id")
-	myCookies := make(map[string]string)
-	if !ok {
-		myCookies = newCookie(&w)
-		userID = myCookies["id"]
+	// Issue cookie
+	userID, err := ensureCookie(&w, r, "id")
+	if err != nil {
+		writeError(&w, http.StatusInternalServerError, err)
+		return
 	}
-	_ = myCookies
 	// JSON
 	var reqJSONBatch []RequestJSONBatchItem
 	var resJSONBatch []ResponseJSONBatchItem
 	var buf bytes.Buffer
-	_, err := buf.ReadFrom(r.Body)
+	_, err = buf.ReadFrom(r.Body)
 	if err != nil {
 		writeError(&w, http.StatusBadRequest, err)
 		return
@@ -264,18 +284,17 @@ func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 		writeResponse(&w, None, http.StatusBadRequest, nil)
 		return
 	}
-	userID, ok, _ := getCookie(r, "id")
-	myCookies := make(map[string]string)
-	if !ok {
-		myCookies = newCookie(&w)
-		userID = myCookies["id"]
+	// Issue cookie
+	userID, err := ensureCookie(&w, r, "id")
+	if err != nil {
+		writeError(&w, http.StatusInternalServerError, err)
+		return
 	}
-	_ = myCookies
 	// JSON
 	var reqJSON RequestJSON
 	var resJSON ResponseJSON
 	var buf bytes.Buffer
-	_, err := buf.ReadFrom(r.Body)
+	_, err = buf.ReadFrom(r.Body)
 	if err != nil {
 		writeError(&w, http.StatusBadRequest, err)
 		return
@@ -310,24 +329,15 @@ func (rt *Runtime) ShortenURLJSON(w http.ResponseWriter, r *http.Request) {
 	writeResponse(&w, JSON, http.StatusCreated, res)
 }
 
-func getCookie(r *http.Request, name string) (string, bool, error) {
-	cookie, err := r.Cookie(name)
-	if err != nil {
-		return "", false, err
-	}
-	return cookie.Value, true, nil
-}
-
 // Send response to POST requests
 func (rt *Runtime) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
-	userID, ok, _ := getCookie(r, "id")
-	myCookies := make(map[string]string)
-	if !ok {
-		myCookies = newCookie(&w)
-		userID = myCookies["id"]
+	// Issue cookie
+	userID, err := ensureCookie(&w, r, "id")
+	if err != nil {
+		writeError(&w, http.StatusInternalServerError, err)
+		return
 	}
-	_ = myCookies
 	if GetContentTypeCode(contentType) == URLEncoded {
 		r.ParseForm()
 		origURL := strings.Join(r.PostForm["url"], "")
