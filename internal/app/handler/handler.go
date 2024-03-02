@@ -110,7 +110,7 @@ func GetContentTypeName(code ContentType) string {
 			return t.Name
 		}
 	}
-	return "unsupported"
+	return "none"
 }
 
 func generateShortKey() string {
