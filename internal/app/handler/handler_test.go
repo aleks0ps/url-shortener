@@ -85,7 +85,6 @@ func TestGetOrigURL(t *testing.T) {
 	for _, url := range urls {
 		_, _, err := rt.URLs.Store(ctx, &url)
 		if err != nil {
-			fmt.Println("STORE ERROR!!")
 			fmt.Println(err)
 		}
 	}
