@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
@@ -119,7 +120,9 @@ func (p *PGURLStorage) Store(ctx context.Context, rec *URLRecord) (origRec *URLR
 
 func (p *PGURLStorage) Load(ctx context.Context, key string) (URLRecord, bool, error) {
 	var rec URLRecord
-	err := p.DB.QueryRow(ctx, "select short_key,original_url,user_id from urls where short_key=$1", key).Scan(&rec.ShortKey, &rec.OriginalURL, &rec.UserID)
+	err := p.DB.QueryRow(ctx, `select short_key,original_url,user_id,is_deleted 
+				   from urls 
+				   where short_key=$1`, key).Scan(&rec.ShortKey, &rec.OriginalURL, &rec.UserID, &rec.DeletedFlag)
 	if err != nil {
 		p.logger.Errorln(err.Error())
 		return URLRecord{}, false, err
@@ -155,47 +158,114 @@ func (p *PGURLStorage) List(ctx context.Context, ID string) ([]*URLRecord, error
 	return res, nil
 }
 
-func (p *PGURLStorage) Delete(ctx context.Context, recs []*URLRecord) error {
-	// unbuffered, blocking
-	pipeCh := make(chan *URLRecord)
+// return chanell with data
+func generator(doneCh chan struct{}, records []*URLRecord) chan *URLRecord {
+	// unbufferd, blocking, channel with data
+	inputCh := make(chan *URLRecord)
 	go func() {
-		defer close(pipeCh)
-		// Send data
-		for _, rec := range recs {
+		defer close(inputCh)
+		for _, rec := range records {
 			select {
-			case pipeCh <- rec:
+			// put data into channel
+			case inputCh <- rec:
 			}
 		}
 	}()
+	return inputCh
+}
 
+func createBatch(doneCh chan struct{}, inputCh chan *URLRecord) chan *pgx.Batch {
+	batchCh := make(chan *pgx.Batch)
 	go func() {
-		ctx := context.Background()
-		tx, err := p.DB.Begin(ctx)
-		if err != nil {
-			p.logger.Errorln(err.Error())
-			return
-		}
-		defer tx.Rollback(ctx)
+		defer close(batchCh)
 		batch := &pgx.Batch{}
-		var numUpdates int = 0
-		// Read data and create queries
-		for rec := range pipeCh {
-			markDeletedSQL := `UPDATE urls SET is_deleted=TRUE WHERE short_key=$1 AND user_id=$2`
-			batch.Queue(markDeletedSQL, rec.ShortKey, rec.UserID)
-			numUpdates += 1
-		}
-		br := tx.SendBatch(ctx, batch)
-		for i := 0; i < numUpdates; i++ {
-			_, err := br.Query()
-			if err != nil {
-				p.logger.Errorln(err.Error())
+		for rec := range inputCh {
+			select {
+			case <-doneCh:
+				return
+			default:
+				// collect instructions to batch
+				updateSQL := `UPDATE urls SET is_deleted=TRUE WHERE short_key=$1 AND user_id=$2`
+				batch.Queue(updateSQL, rec.ShortKey, rec.UserID)
 			}
 		}
-		err = br.Close()
-		if err != nil {
-			p.logger.Errorln(err.Error())
+		batchCh <- batch
+	}()
+	return batchCh
+}
+
+func fanOut(doneCh chan struct{}, inputCh chan *URLRecord) []chan *pgx.Batch {
+	// make some workers
+	numWorkers := 10
+	batchChannels := make([]chan *pgx.Batch, numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		batchCh := createBatch(doneCh, inputCh)
+		batchChannels[i] = batchCh
+	}
+	return batchChannels
+}
+
+func fanIn(doneCh chan struct{}, batchChs ...chan *pgx.Batch) chan *pgx.Batch {
+	updateCh := make(chan *pgx.Batch)
+	var wg sync.WaitGroup
+	// read from batch channels
+	for _, bch := range batchChs {
+		bchClosure := bch
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for b := range bchClosure {
+				select {
+				case <-doneCh:
+					return
+				case updateCh <- b:
+				}
+			}
+		}()
+	}
+
+	go func() {
+		// wait all the go routines
+		wg.Wait()
+		close(updateCh)
+	}()
+
+	return updateCh
+}
+
+func (p *PGURLStorage) Delete(ctx context.Context, records []*URLRecord) error {
+	doneCh := make(chan struct{})
+	inputCh := generator(doneCh, records)
+	batchChannels := fanOut(doneCh, inputCh)
+	updateCh := fanIn(doneCh, batchChannels...)
+	go func() {
+		// Read batches from batch channel
+		for batch := range updateCh {
+			select {
+			case <-doneCh:
+				return
+			default:
+				ctx := context.Background()
+				tx, err := p.DB.Begin(ctx)
+				if err != nil {
+					p.logger.Errorln(err.Error())
+					return
+				}
+				defer tx.Rollback(ctx)
+				br := tx.SendBatch(ctx, batch)
+				/*for i := 0; i < numUpdates; i++ {
+					_, err := br.Query()
+					if err != nil {
+						p.logger.Errorln(err.Error())
+					}
+				}*/
+				err = br.Close()
+				if err != nil {
+					p.logger.Errorln(err.Error())
+				}
+				tx.Commit(ctx)
+			}
 		}
-		tx.Commit(ctx)
 	}()
 	return nil
 }

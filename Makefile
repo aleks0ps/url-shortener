@@ -61,7 +61,7 @@ list:
 	@curl --cookie "id=$(ID)" $(SVC)/api/user/urls; echo
 
 delete:
-	echo '["O2AHEI"]' | curl -X DELETE -H "Content-Type: application/json" --data-binary @- --cookie "id=$(ID)" $(SVC)/api/user/urls; echo
+	echo '["Wv2qTI"]' | curl -X DELETE -H "Content-Type: application/json" --data-binary @- --cookie "id=$(ID)" $(SVC)/api/user/urls; echo
 
 gzip:
 	@echo '{"url":"$(YA)"}' | gzip | curl -v -i --data-binary @- -H "Content-Type: application/json" -H "Content-Encoding: gzip" $(SVC)/api/shorten; echo
