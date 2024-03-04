@@ -15,9 +15,8 @@ type URLStorage struct {
 	// writer
 	writer *bufio.Writer
 	// reader
-	scanner  *bufio.Scanner
-	logger   *zap.SugaredLogger
-	deleteCh chan *URLRecord
+	scanner *bufio.Scanner
+	logger  *zap.SugaredLogger
 }
 
 type URLEvent struct {
@@ -33,17 +32,16 @@ func NewURLStorage(filename string, s *zap.SugaredLogger) *URLStorage {
 			return nil
 		}
 		URLs := URLStorage{
-			db:       make(map[string]*URLRecord),
-			file:     file,
-			writer:   bufio.NewWriter(file),
-			scanner:  bufio.NewScanner(file),
-			logger:   s,
-			deleteCh: make(chan *URLRecord),
+			db:      make(map[string]*URLRecord),
+			file:    file,
+			writer:  bufio.NewWriter(file),
+			scanner: bufio.NewScanner(file),
+			logger:  s,
 		}
 		return &URLs
 	}
 	// just in-memory storage
-	return &URLStorage{db: make(map[string]*URLRecord), file: nil, writer: nil, scanner: nil, logger: s, deleteCh: make(chan *URLRecord)}
+	return &URLStorage{db: make(map[string]*URLRecord), file: nil, writer: nil, scanner: nil, logger: s}
 }
 
 func (u *URLStorage) LoadFromFile(ctx context.Context) {
@@ -148,26 +146,6 @@ func (u *URLStorage) List(ctx context.Context, ID string) ([]*URLRecord, error) 
 }
 
 func (u *URLStorage) Delete(ctx context.Context, recs []*URLRecord) error {
-	doneCh := make(chan int)
-	go func() {
-		defer close(doneCh)
-		for _, rec := range recs {
-			u.deleteCh <- rec
-		}
-	}()
-
-	go func() {
-		for {
-			select {
-			case rec := <-u.deleteCh:
-				memRec := u.db[rec.ShortKey]
-				if memRec.ShortKey == rec.ShortKey && memRec.UserID == rec.UserID {
-					memRec.DeletedFlag = true
-				}
-			case <-doneCh:
-				return
-			}
-		}
-	}()
+	// not implemented
 	return nil
 }

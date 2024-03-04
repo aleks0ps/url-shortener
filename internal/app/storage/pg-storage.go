@@ -165,10 +165,8 @@ func generator(doneCh chan struct{}, records []*URLRecord) chan *URLRecord {
 	go func() {
 		defer close(inputCh)
 		for _, rec := range records {
-			select {
 			// put data into channel
-			case inputCh <- rec:
-			}
+			inputCh <- rec
 		}
 	}()
 	return inputCh
@@ -245,25 +243,21 @@ func (p *PGURLStorage) Delete(ctx context.Context, records []*URLRecord) error {
 			case <-doneCh:
 				return
 			default:
-				ctx := context.Background()
-				tx, err := p.DB.Begin(ctx)
-				if err != nil {
-					p.logger.Errorln(err.Error())
-					return
-				}
-				defer tx.Rollback(ctx)
-				br := tx.SendBatch(ctx, batch)
-				/*for i := 0; i < numUpdates; i++ {
-					_, err := br.Query()
+				func() {
+					ctx := context.Background()
+					tx, err := p.DB.Begin(ctx)
+					if err != nil {
+						p.logger.Errorln(err.Error())
+						return
+					}
+					defer tx.Rollback(ctx)
+					br := tx.SendBatch(ctx, batch)
+					err = br.Close()
 					if err != nil {
 						p.logger.Errorln(err.Error())
 					}
-				}*/
-				err = br.Close()
-				if err != nil {
-					p.logger.Errorln(err.Error())
-				}
-				tx.Commit(ctx)
+					tx.Commit(ctx)
+				}()
 			}
 		}
 	}()
