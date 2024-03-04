@@ -59,7 +59,9 @@ curl:
 
 list:
 	@curl --cookie "id=$(ID)" $(SVC)/api/user/urls; echo
-	@curl --cookie "token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkxPMk83cUN3bUIiLCJleHAiOjE3MDkxNTUwMzJ9.WjZe8SBjR9Jwp4HYvn74Dh9vEG2dsWBpcB0G5YzEi2A; id=LO2O7qCwmB" $(SVC)/api/user/urls; echo
+
+delete:
+	echo '["O2AHEI"]' | curl -X DELETE -H "Content-Type: application/json" --data-binary @- --cookie "id=$(ID)" $(SVC)/api/user/urls; echo
 
 gzip:
 	@echo '{"url":"$(YA)"}' | gzip | curl -v -i --data-binary @- -H "Content-Type: application/json" -H "Content-Encoding: gzip" $(SVC)/api/shorten; echo

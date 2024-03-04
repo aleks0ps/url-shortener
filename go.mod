@@ -21,6 +21,7 @@ require (
 	github.com/jackc/pgx/v5 v5.5.3 // indirect
 	github.com/jackc/puddle v1.3.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
+	github.com/pkg/errors v0.8.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
 	go.uber.org/multierr v1.10.0 // indirect

@@ -51,6 +51,7 @@ func Run() {
 		ListenAddress: opts.ListenAddr,
 		DBURL:         opts.DatabaseDSN,
 		URLs:          storage,
+		Logger:        sugar,
 	}
 	r := chi.NewRouter()
 	r.Use(mw.DisableDefaultLogger())
@@ -60,6 +61,7 @@ func Run() {
 	r.Get("/{id}", rt.GetOrigURL)
 	r.Route("/api/user/urls", func(r chi.Router) {
 		r.Get("/", rt.ListURLsJSON)
+		r.Delete("/", rt.DeleteURLsJSON)
 	})
 	r.Post("/api/shorten", rt.ShortenURLJSON)
 	r.Post("/api/shorten/batch", rt.ShortenURLJSONBatch)

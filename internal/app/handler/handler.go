@@ -12,7 +12,9 @@ import (
 
 	mycookie "github.com/aleks0ps/url-shortener/internal/app/cookie"
 	"github.com/aleks0ps/url-shortener/internal/app/storage"
+
 	"github.com/jackc/pgx/v4"
+	"go.uber.org/zap"
 )
 
 type ContentType int
@@ -23,6 +25,7 @@ type Runtime struct {
 	ListenAddress string
 	DBURL         string
 	URLs          storage.Storager
+	Logger        *zap.SugaredLogger
 }
 
 const (
@@ -191,6 +194,49 @@ func writeResponse(w *http.ResponseWriter, t ContentType, status int, data []byt
 
 func writeError(w *http.ResponseWriter, status int, err error) {
 	http.Error(*w, err.Error(), status)
+}
+
+func (rt *Runtime) DeleteURLsJSON(w http.ResponseWriter, r *http.Request) {
+	var buf bytes.Buffer
+	var shortKeys []string
+	var deletedURLs []*storage.URLRecord
+	contentType := r.Header.Get("Content-Type")
+	if GetContentTypeCode(contentType) != JSON {
+		writeResponse(&w, None, http.StatusBadRequest, nil)
+		return
+	}
+	userID, err := getCookie(r, "id")
+	if err != nil {
+		writeError(&w, http.StatusUnauthorized, err)
+		return
+	}
+	// JSON
+	_, err = buf.ReadFrom(r.Body)
+	if err != nil {
+		writeError(&w, http.StatusBadRequest, err)
+		return
+	}
+	if err := json.Unmarshal(buf.Bytes(), &shortKeys); err != nil {
+		writeError(&w, http.StatusBadRequest, err)
+		return
+	}
+	if len(shortKeys) == 0 {
+		writeResponse(&w, None, http.StatusBadRequest, nil)
+		return
+	}
+	for _, key := range shortKeys {
+		var rec storage.URLRecord
+		rec.UserID = userID
+		rec.ShortKey = key
+		rec.DeletedFlag = true
+		deletedURLs = append(deletedURLs, &rec)
+	}
+	// Delete selected URLs
+	err = rt.URLs.Delete(r.Context(), deletedURLs)
+	if err != nil {
+		rt.Logger.Errorln(err)
+	}
+	writeResponse(&w, None, http.StatusAccepted, nil)
 }
 
 func (rt *Runtime) ListURLsJSON(w http.ResponseWriter, r *http.Request) {
@@ -375,6 +421,10 @@ func (rt *Runtime) GetOrigURL(w http.ResponseWriter, r *http.Request) {
 	shortKey := r.URL.RequestURI()[1:]
 	origRec, ok, _ := rt.URLs.Load(r.Context(), shortKey)
 	if ok {
+		if origRec.DeletedFlag {
+			writeResponse(&w, None, http.StatusGone, nil)
+			return
+		}
 		http.Redirect(w, r, origRec.OriginalURL, http.StatusTemporaryRedirect)
 	} else {
 		writeResponse(&w, None, http.StatusBadRequest, nil)

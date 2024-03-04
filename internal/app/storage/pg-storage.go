@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
@@ -20,7 +21,9 @@ func tmpDBInit(ctx context.Context, db *pgxpool.Pool, s *zap.SugaredLogger) erro
 			uuid BIGSERIAL PRIMARY KEY,
 			short_key TEXT NOT NULL,
 			original_url TEXT NOT NULL,
-			user_id TEXT NOT NULL);
+			user_id TEXT NOT NULL,
+			is_deleted BOOLEAN NOT NULL DEFAULT FALSE
+			);
 			CREATE UNIQUE INDEX uniq_urls ON urls (original_url) NULLS NOT DISTINCT
 			`)
 	if err != nil {
@@ -150,4 +153,49 @@ func (p *PGURLStorage) List(ctx context.Context, ID string) ([]*URLRecord, error
 		return res, err
 	}
 	return res, nil
+}
+
+func (p *PGURLStorage) Delete(ctx context.Context, recs []*URLRecord) error {
+	// unbuffered, blocking
+	pipeCh := make(chan *URLRecord)
+	go func() {
+		defer close(pipeCh)
+		// Send data
+		for _, rec := range recs {
+			select {
+			case pipeCh <- rec:
+			}
+		}
+	}()
+
+	go func() {
+		ctx := context.Background()
+		tx, err := p.DB.Begin(ctx)
+		if err != nil {
+			p.logger.Errorln(err.Error())
+			return
+		}
+		defer tx.Rollback(ctx)
+		batch := &pgx.Batch{}
+		var numUpdates int = 0
+		// Read data and create queries
+		for rec := range pipeCh {
+			markDeletedSQL := `UPDATE urls SET is_deleted=TRUE WHERE short_key=$1 AND user_id=$2`
+			batch.Queue(markDeletedSQL, rec.ShortKey, rec.UserID)
+			numUpdates += 1
+		}
+		br := tx.SendBatch(ctx, batch)
+		for i := 0; i < numUpdates; i++ {
+			_, err := br.Query()
+			if err != nil {
+				p.logger.Errorln(err.Error())
+			}
+		}
+		err = br.Close()
+		if err != nil {
+			p.logger.Errorln(err.Error())
+		}
+		tx.Commit(ctx)
+	}()
+	return nil
 }
