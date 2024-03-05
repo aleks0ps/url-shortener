@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"math/rand"
 	"net/http"
@@ -158,6 +159,34 @@ func getCookie(r *http.Request, name string) (string, error) {
 	return cookie.Value, nil
 }
 
+func validateCookie(r *http.Request) error {
+	// plain text
+	ID, err := getCookie(r, "id")
+	if err != nil {
+		return err
+	}
+	// encoded
+	tokenString, err := getCookie(r, "token")
+	if err != nil {
+		return err
+	}
+	// decode token string
+	claims, ok, err := mycookie.CheckToken(tokenString)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		err := errors.New("token expired")
+		return err
+	}
+	// compare
+	if claims.ID != ID {
+		err := errors.New("token invalid")
+		return err
+	}
+	return nil
+}
+
 func ensureCookie(w *http.ResponseWriter, r *http.Request, name string) (string, error) {
 	cookieValue, err := getCookie(r, name)
 	if err != nil {
@@ -200,16 +229,18 @@ func (rt *Runtime) DeleteURLsJSON(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
 	var shortKeys []string
 	var deletedURLs []*storage.URLRecord
+
 	contentType := r.Header.Get("Content-Type")
 	if GetContentTypeCode(contentType) != JSON {
 		writeResponse(&w, None, http.StatusBadRequest, nil)
 		return
 	}
-	userID, err := getCookie(r, "id")
+	err := validateCookie(r)
 	if err != nil {
 		writeError(&w, http.StatusUnauthorized, err)
 		return
 	}
+	userID, _ := getCookie(r, "id")
 	// JSON
 	_, err = buf.ReadFrom(r.Body)
 	if err != nil {
@@ -242,11 +273,12 @@ func (rt *Runtime) DeleteURLsJSON(w http.ResponseWriter, r *http.Request) {
 func (rt *Runtime) ListURLsJSON(w http.ResponseWriter, r *http.Request) {
 	var recListJSON []ResponseJSONRecord
 	// Check Cookie
-	userID, err := getCookie(r, "id")
+	err := validateCookie(r)
 	if err != nil {
 		writeError(&w, http.StatusUnauthorized, err)
 		return
 	}
+	userID, _ := getCookie(r, "id")
 	recList, err := rt.URLs.List(r.Context(), userID)
 	if err != nil {
 		writeError(&w, http.StatusInternalServerError, err)

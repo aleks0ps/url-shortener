@@ -43,22 +43,22 @@ func NewToken(expirationTime time.Time) (string, *Claims, error) {
 	return tokenString, claims, nil
 }
 
-func checkToken(tokenStr string) (bool, error) {
+func CheckToken(tokenStr string) (*Claims, bool, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (any, error) {
-		return jwtKey, nil
+		return []byte(jwtKey), nil
 	})
 	if err != nil {
-		return false, err
+		return &Claims{}, false, err
 	}
 	// expired
 	if !token.Valid {
-		return false, nil
+		return &Claims{}, false, nil
 	}
-	return true, nil
+	return claims, true, nil
 }
 
-func refreshToken(expirationTime time.Time, tokenStr string) (string, bool, error) {
+func RefreshToken(expirationTime time.Time, tokenStr string) (string, bool, error) {
 	claims := &Claims{}
 	_, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (any, error) {
 		return jwtKey, nil
