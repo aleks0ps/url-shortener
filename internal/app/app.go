@@ -57,14 +57,14 @@ func Run() {
 	r.Use(mw.DisableDefaultLogger())
 	r.Use(mw.Logger(sugar))
 	r.Use(mw.Gziper())
-	r.Get("/ping", rt.DBIsAlive)
+	r.Get("/ping", rt.PingDB)
 	r.Get("/{id}", rt.GetOrigURL)
 	r.Route("/api/user/urls", func(r chi.Router) {
 		r.Get("/", rt.ListURLsJSON)
 		r.Delete("/", rt.DeleteURLsJSON)
 	})
 	r.Post("/api/shorten", rt.ShortenURLJSON)
-	r.Post("/api/shorten/batch", rt.ShortenURLJSONBatch)
+	r.Post("/api/shorten/batch", rt.ShortenURLBatchJSON)
 	r.Post("/", rt.ShortenURL)
 	http.ListenAndServe(rt.ListenAddress, r)
 }
