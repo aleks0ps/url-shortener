@@ -1,7 +1,9 @@
 package cookie
 
 import (
+	"errors"
 	"math/rand"
+	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -73,4 +75,77 @@ func RefreshToken(expirationTime time.Time, tokenStr string) (string, bool, erro
 		return "", false, err
 	}
 	return tokenString, true, nil
+}
+
+func NewCookie(w *http.ResponseWriter) (map[string]string, error) {
+	res := make(map[string]string)
+	expirationTime := time.Now().Add(5 * time.Minute)
+	tokenString, claims, err := NewToken(expirationTime)
+	if err != nil {
+		return nil, err
+	}
+	http.SetCookie(*w, &http.Cookie{
+		Name:    "token",
+		Value:   tokenString,
+		Expires: expirationTime,
+	})
+	http.SetCookie(*w, &http.Cookie{
+		Name:    "id",
+		Value:   claims.ID,
+		Expires: expirationTime,
+	})
+	res["id"] = (*claims).ID
+	res["token"] = tokenString
+	return res, nil
+}
+
+func GetCookie(r *http.Request, name string) (string, error) {
+	cookie, err := r.Cookie(name)
+	if err != nil {
+		return "", err
+	}
+	return cookie.Value, nil
+}
+
+func ValidateCookie(r *http.Request) error {
+	// plain text
+	ID, err := GetCookie(r, "id")
+	if err != nil {
+		return err
+	}
+	// encoded
+	tokenString, err := GetCookie(r, "token")
+	if err != nil {
+		return err
+	}
+	// decode token string
+	claims, ok, err := CheckToken(tokenString)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		err := errors.New("token expired")
+		return err
+	}
+	// compare
+	if claims.ID != ID {
+		err := errors.New("token invalid")
+		return err
+	}
+	return nil
+}
+
+func EnsureCookie(w *http.ResponseWriter, r *http.Request, name string) (string, error) {
+	cookieValue, err := GetCookie(r, name)
+	if err != nil {
+		// No cookie found
+		// Generate new
+		myCookies, err := NewCookie(w)
+		if err != nil {
+			return "", err
+		}
+		cookieValue = myCookies[name]
+	}
+	// return cookie value
+	return cookieValue, nil
 }

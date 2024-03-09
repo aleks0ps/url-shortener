@@ -8,7 +8,8 @@ import (
 	"strings"
 	"time"
 
-	h "github.com/aleks0ps/url-shortener/internal/app/handler"
+	myhttp "github.com/aleks0ps/url-shortener/internal/app/http"
+
 	m "github.com/go-chi/chi/middleware"
 	"go.uber.org/zap"
 )
@@ -75,7 +76,6 @@ func Logger(s *zap.SugaredLogger) func(next http.Handler) http.Handler {
 				"size", responseData.size, // получаем перехваченный размер ответа
 			)
 		}
-
 		return http.HandlerFunc(fnLog)
 	}
 }
@@ -112,9 +112,9 @@ func Gziper() func(next http.Handler) http.Handler {
 			// Set the same content type
 			dR.Header.Set("Content-Type", r.Header.Get("Content-Type"))
 			if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-				typeCode := h.GetContentTypeCode(r.Header.Get("Content-Type"))
+				typeCode := myhttp.GetContentTypeCode(r.Header.Get("Content-Type"))
 				switch typeCode {
-				case h.PlainText, h.HTML:
+				case myhttp.PlainText, myhttp.HTML:
 					eW, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
 					if err != nil {
 						http.Error(w, err.Error(), http.StatusInternalServerError)
