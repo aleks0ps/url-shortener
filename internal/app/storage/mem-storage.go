@@ -24,6 +24,12 @@ type URLEvent struct {
 	URLRecord
 }
 
+func NewMemStorage(ctx context.Context, path string, logger *zap.SugaredLogger) *URLStorage {
+	mem := NewURLStorage(path, logger)
+	mem.LoadFromFile(ctx)
+	return mem
+}
+
 func NewURLStorage(filename string, s *zap.SugaredLogger) *URLStorage {
 	if len(filename) > 0 {
 		file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)

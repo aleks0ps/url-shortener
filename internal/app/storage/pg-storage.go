@@ -34,6 +34,15 @@ func tmpDBInit(ctx context.Context, db *pgxpool.Pool, s *zap.SugaredLogger) erro
 	return nil
 }
 
+func NewDBStorage(ctx context.Context, DSN string, logger *zap.SugaredLogger) *PGURLStorage {
+	db, err := PGNewURLStorage(ctx, DSN, logger)
+	if err != nil {
+		logger.Errorln(err)
+		return nil
+	}
+	return db
+}
+
 func PGNewURLStorage(ctx context.Context, databaseDSN string, s *zap.SugaredLogger) (*PGURLStorage, error) {
 	poolConfig, err := pgxpool.ParseConfig(databaseDSN)
 	if err != nil {

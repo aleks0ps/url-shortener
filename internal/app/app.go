@@ -13,23 +13,8 @@ import (
 	"github.com/aleks0ps/url-shortener/internal/app/storage"
 )
 
-func newDBStorage(ctx context.Context, opts *config.Config, logger *zap.SugaredLogger) *storage.PGURLStorage {
-	db, err := storage.PGNewURLStorage(ctx, opts.DatabaseDSN, logger)
-	if err != nil {
-		logger.Errorln(err)
-		return nil
-	}
-	return db
-}
-
-func newMemStorage(ctx context.Context, opts *config.Config, logger *zap.SugaredLogger) *storage.URLStorage {
-	mem := storage.NewURLStorage(opts.StoragePath, logger)
-	mem.LoadFromFile(ctx)
-	return mem
-}
-
 func Run() {
-	var storage storage.Storager
+	var store storage.Storager
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	logger, err := zap.NewDevelopment()
@@ -40,17 +25,18 @@ func Run() {
 	sugar := logger.Sugar()
 	opts := config.ParseOptions()
 	// init storage
-	db := newDBStorage(ctx, opts, sugar)
+	db := storage.NewDBStorage(ctx, opts.DatabaseDSN, sugar)
 	if db != nil {
-		storage = db
+		store = db
 	} else {
-		storage = newMemStorage(ctx, opts, sugar)
+		// user memory if database is not available
+		store = storage.NewMemStorage(ctx, opts.StoragePath, sugar)
 	}
 	rt := handler.Runtime{
 		BaseURL:       opts.BaseURL,
 		ListenAddress: opts.ListenAddr,
 		DBURL:         opts.DatabaseDSN,
-		URLs:          storage,
+		URLs:          store,
 		Logger:        sugar,
 	}
 	r := chi.NewRouter()
